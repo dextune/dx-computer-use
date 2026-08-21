@@ -51,6 +51,7 @@ tests/unit/test_grounder_candidate_scoring.py  ← snake_case 사용
 | `pyproject.toml` | Python 규약 |
 | `Dockerfile` | 생태계 표준 |
 | `Makefile` | 생태계 표준 |
+| `AGENTS.md` | 에이전트 엔트리포인트 규약 |
 | `.github/` 하위 모든 파일 | GitHub Actions 규약 |
 
 ---
@@ -61,8 +62,8 @@ tests/unit/test_grounder_candidate_scoring.py  ← snake_case 사용
 
 | 대상 | 규칙 | 예시 |
 |---|---|---|
-| 패키지 디렉터리 | snake_case | `runtime_core/`, `scene_graph/` |
-| 모듈 파일 | snake_case | `control_loop.py`, `browser_adapter.py` |
+| 패키지 디렉터리 | snake_case | `runtime_core/`, `scene_graph/`, `platform/windows/` |
+| 모듈 파일 | snake_case | `control_loop.py`, `browser_adapter.py`, `capture_backend.py` |
 | 테스트 모듈 | `test_` prefix + snake_case | `test_control_loop.py` |
 
 ### 3.2 클래스
@@ -70,10 +71,10 @@ tests/unit/test_grounder_candidate_scoring.py  ← snake_case 사용
 | 대상 | 규칙 | 예시 |
 |---|---|---|
 | 클래스 | PascalCase | `Observer`, `SceneGraph`, `BrowserAdapter` |
-| ABC (추상 기반 클래스) | PascalCase, suffix 없음 | `Observer`, `Grounder`, `Verifier` |
-| 구현 클래스 | PascalCase + 구체적 명칭 | `BrowserObserver`, `Win32UIAObserver`, `TemplateGrounder` |
+| ABC (추상 기반 클래스) | PascalCase, suffix 없음 | `Observer`, `Grounder`, `Verifier`, `CaptureBackend`, `InputInjector` |
+| 구현 클래스 | PascalCase + 구체적 명칭 | `BrowserObserver`, `Win32UIAObserver`, `LinuxX11Capture`, `MacosCgEventInjector` |
 | 예외 클래스 | PascalCase + `Error` suffix | `ObservationError`, `GroundingError`, `StaleDecisionError` |
-| 데이터 클래스 (DTO) | PascalCase, 동사형 금지 | `FrameHandle`, `SceneDelta`, `UIElement` |
+| 데이터 클래스 (DTO) | PascalCase, 동사형 금지 | `FrameHandle`, `SceneDelta`, `UIElement`, `CaptureCapabilities`, `InputCapabilities` |
 
 ### 3.3 함수/메서드
 

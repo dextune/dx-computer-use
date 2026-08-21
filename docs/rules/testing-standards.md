@@ -41,9 +41,14 @@ tests/
 │  ├─ test_model_timeout_escalation.py
 │  ├─ test_stale_decision_rejection.py
 │  └─ test_observer_disconnect_recovery.py
-└─ e2e/                     # 실제 브라우저/Windows 대상, Phase 4+ 활성화
-   ├─ test_browser_login_flow.py
-   └─ test_windows_notepad_action.py
+└─ e2e/                     # 실제 OS/브라우저. 기본 PR 게이트 아님
+   ├─ platform/
+   │  ├─ test_browser_login_flow.py
+   │  ├─ test_windows_notepad_action.py
+   │  ├─ test_linux_x11_xvfb.py
+   │  ├─ test_macos_ax.py
+   │  └─ test_remote_vnc.py
+   └─ test_cross_dsl_parity.py   # 동일 Action DSL, 플러그인만 다름
 ```
 
 ---
@@ -210,6 +215,12 @@ pytest tests/ --cov=hpcu --cov-report=term --cov-report=html
 | `@pytest.mark.replay` | trajectory 재생 | ≤ 500ms per case |
 | `@pytest.mark.failure_injection` | 장애 주입 | ≤ 1s per case |
 | `@pytest.mark.e2e` | 실제 환경 | ≤ 30s per case |
+| `@pytest.mark.platform_browser` | Playwright fixture | ≤ 30s |
+| `@pytest.mark.platform_windows` | Windows runner 전용 | ≤ 30s |
+| `@pytest.mark.platform_linux_x11` | Xvfb/Docker 샌드박스 | ≤ 30s |
+| `@pytest.mark.platform_linux_wayland` | 전용 runner, 기본 CI 스킵 | ≤ 30s |
+| `@pytest.mark.platform_macos` | macOS runner + TCC | ≤ 30s |
+| `@pytest.mark.platform_remote` | VNC fixture | ≤ 30s |
 
 마커 누락 시 CI에서 실패 처리한다.
 
@@ -354,7 +365,41 @@ pytest --doctest-modules docs/
 
 ---
 
-## 9. 이 문서의 적용 범위
+## 9. 플랫폼 테스트 (크로스 OS)
+
+네이티브 Capture/Input은 OS 실기 없이는 증명할 수 없다. 그래도 PR이
+Windows 머신에 묶이면 안 된다.
+
+### 9.1 기본 게이트 (모든 PR)
+
+- `CaptureBackend` / `InputInjector` 계약: **fake** 구현
+- Perception: fixture 프레임
+- Browser: Playwright fixture (`platform_browser`)
+- `hpcu.vision` / `hpcu.scene_graph` / `hpcu.runtime_core`가
+  `hpcu.platform`을 import하면 실패
+
+### 9.2 OS matrix (required 아님, ADR로 승격)
+
+| Job | 마커 | 러너 |
+|---|---|---|
+| Windows | `platform_windows` | windows-latest |
+| Linux X11 | `platform_linux_x11` | ubuntu + Xvfb 또는 샌드박스 컨테이너 |
+| Linux Wayland | `platform_linux_wayland` | 수동/전용. 기본 스킵 |
+| macOS | `platform_macos` | macos-latest (TCC는 문서화) |
+| Remote | `platform_remote` | 샌드박스 noVNC 또는 RFB fixture |
+
+실기 테스트가 없는 플러그인 변경은 merge 가능하나 Phase 8 완료 조건은
+해당 job 통과다.
+
+### 9.3 Fake backend 규칙
+
+- 실제 DXGI/X11/CGEvent를 unit에서 호출하지 않는다
+- `FrameHandle`에 bytes를 넣지 않는다 (shm_id만)
+- capture.session_id != input.session_id 조합은 부팅 실패를 검증한다
+
+---
+
+## 10. 이 문서의 적용 범위
 
 - 본 문서는 프로젝트 전체에 적용된다.
 - 모든 PR은 본 문서의 CI 게이트를 통과해야 한다.

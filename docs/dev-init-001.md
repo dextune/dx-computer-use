@@ -96,6 +96,19 @@ CPU 영상처리 + OCR + 템플릿 + 상태 추적
 
 즉, **픽셀은 공통 최후 수단이지 공통 첫 수단이 아닙니다.**
 
+화면 경로 자체는 세 층으로 나눕니다. OS를 복제하지 않습니다.
+
+```text
+CaptureBackend (OS 플러그인)  →  픽셀 획득
+StructureObserver (OS 플러그인, 없을 수 있음)  →  DOM/AX/UIA/AT-SPI
+Perception (공통, OS 코드 금지)  →  OCR·Scene Graph
+InputInjector (OS 플러그인)  →  semantic 액션 또는 물리 입력
+```
+
+Docker Linux, 호스트 Linux, Windows, macOS, VNC는 이 네 계약에 등록되는
+플러그인일 뿐입니다. 상세: `docs/plan/03-observation-layer.md`,
+`docs/decisions/001-three-layer-platform.md`.
+
 ---
 
 ## 3. 프로젝트 정의
@@ -128,7 +141,7 @@ HPCU Runtime은 사용자 자연어 목표를 받아 다음을 수행하는 로�
 - 절대 좌표가 아니라 재탐색 가능한 객체 참조를 사용
 - AI가 느리게 응답해도 현재 화면을 재검증한 뒤 실행
 - 반복 작업은 점진적으로 `0 model call` 경로로 승격
-- 브라우저와 데스크톱을 동일한 상위 Action DSL로 조작
+- 브라우저와 데스크톱(Windows/Linux/macOS/원격)을 동일한 상위 Action DSL로 조작
 
 ### 3.4 비목표
 
@@ -139,7 +152,7 @@ HPCU Runtime은 사용자 자연어 목표를 받아 다음을 수행하는 로�
 - CAPTCHA, 보안 확인, 접근 통제를 우회하는 기능
 - AI가 성공했다고 말하는 것만으로 작업 완료를 인정하는 구조
 - 단 한 번의 성공 사례를 검증 없이 자동 규칙으로 승격하는 구조
-- 모든 OS를 첫 버전에서 동시에 완성하는 것
+- 모든 OS 플러그인을 첫 버전에서 동시에 완성하는 것 (계약은 먼저 고정)
 - 픽셀 좌표를 영구 저장해 그대로 재생하는 단순 매크로
 
 ---
@@ -344,6 +357,24 @@ RDP, Citrix, VNC, 스트리밍 화면, 게임, 캔버스 기반 앱은 구조 AP
 → AI 승격
 ```
 
+원격은 `hpcu.platform.remote` 플러그인이다. Capture=framebuffer, Structure=empty,
+Input=RFB pointer/key. 샌드박스의 noVNC는 사람용 표시이고, 가능하면 컨테이너 내부
+X11 grab을 런타임 Capture로 쓴다.
+
+### 6.6 3층 분리 (Capture / Perception / Input)
+
+관찰 계층을 하나의 클래스로 구현하지 않습니다.
+
+| 층 | OS 코드 | 역할 |
+|---|---|---|
+| CaptureBackend | 예 | DXGI, X11, PipeWire, ScreenCaptureKit, CDP, VNC |
+| StructureObserver | 예 (optional) | UIA, AT-SPI, AX, DOM |
+| Perception | 아니오 | OCR, 형상, 템플릿, fusion |
+| InputInjector | 예 | semantic 우선, physical fallback |
+
+지원하지 않는 capability는 숨기지 않고 `UNSUPPORTED`를 반환합니다.
+Linux 호스트와 Docker(Xvfb)는 같은 Linux 플러그인입니다.
+
 ---
 
 ## 7. 고속 화면 캡처와 증분 처리
@@ -361,6 +392,7 @@ RDP, Citrix, VNC, 스트리밍 화면, 게임, 캔버스 기반 앱은 구조 AP
 - 알림 배지
 
 Windows DXGI Desktop Duplication API는 변경된 `dirty rectangle`과 이동된 영역 정보를 제공합니다. 이 정보는 전체 화면 OCR을 피하고 변경 영역만 갱신하는 데 직접 활용할 수 있습니다. [R9]
+이 힌트는 `CaptureBackend`가 `FrameHandle.dirty_rects`로 넘기고, Perception은 API 이름을 모릅니다.
 
 다른 플랫폼에서도 다음 방식으로 유사한 효과를 만듭니다.
 
@@ -936,11 +968,13 @@ AI가 마우스를 직접 움직이는 대신, 제한된 명령 언어를 생성
 
 ```text
 고수준 앱/API 액션
-→ DOM/Accessibility semantic action
+→ InputInjector.semantic()          # DOM/UIA/AT-SPI/AX
 → keyboard shortcut
-→ element-relative click
-→ physical coordinate click
+→ InputInjector.physical()          # 안전 클릭점, OS별 주입
 ```
+
+Executor는 OS API를 직접 호출하지 않습니다. 주입은 전부 `InputInjector` 플러그인입니다.
+Wayland에서 XTest를 몰래 시도하지 않습니다. 권한 거부는 실패 코드입니다.
 
 ### 15.2 단계별 검증
 
@@ -1562,16 +1596,18 @@ high-performance-computer-use/
 │  └─ scene-inspector/
 ├─ crates/
 │  ├─ runtime-core/
-│  ├─ capture/
+│  ├─ capture/                 # ABC + ring buffer (공통)
+│  ├─ input/                   # InputInjector ABC (공통)
 │  ├─ scene-graph/
 │  ├─ grounder/
 │  ├─ executor/
 │  ├─ verifier/
 │  ├─ workflow-compiler/
 │  ├─ policy-engine/
-│  ├─ platform-windows/
-│  ├─ platform-linux/
-│  ├─ platform-macos/
+│  ├─ platform-windows/        # DXGI, UIA, SendInput
+│  ├─ platform-linux/          # X11/PipeWire, AT-SPI, XTest/portal
+│  ├─ platform-macos/          # ScreenCaptureKit, AX, CGEvent
+│  ├─ platform-remote/         # VNC/RDP
 │  └─ browser-playwright/
 ├─ services/
 │  ├─ vision-worker/
@@ -1771,14 +1807,16 @@ high-performance-computer-use/
 
 ## Phase 8 — Linux/macOS 및 원격 화면
 
+ABC와 matrix는 Phase 0~1에서 고정한다. Phase 8은 **플러그인 구현**이다.
+
 ### 구현
 
-- AT-SPI adapter
-- AXUIElement adapter
-- Wayland/X11 정책
-- remote desktop capture/input adapter
-- 권한 설치 가이드
-- 플랫폼별 capability matrix
+- Linux: X11 Capture (호스트·Docker Xvfb 공통), PipeWire Capture, AT-SPI, XTest/portal Input
+- macOS: ScreenCaptureKit, AXUIElement, CGEvent
+- remote: VNC/RDP Capture + RFB Input
+- Wayland 포털 거부 경로 (우회 금지)
+- 권한 `probe()` + 설치 가이드
+- 플랫폼별 capability matrix 실측 갱신
 
 ### 완료 조건
 
@@ -1786,6 +1824,7 @@ high-performance-computer-use/
 - 지원하지 않는 capability를 명시적으로 반환
 - foreground/background 제약 문서화
 - 화면 캡처 권한과 접근성 권한의 안전한 처리
+- Linux 플러그인 제거 후에도 vision/unit 테스트 통과
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "HPCU Runtime 개발 계획 01 — 시스템 아키텍처 및 런타임 구조"
-version: "1.0"
+version: "1.1"
 date: "2026-08-21"
 parent: "docs/dev-init-001.md (§5, §18, §20, §23~24)"
 language: "ko-KR"
@@ -46,22 +46,20 @@ HPCU Runtime은 **공통 인터페이스(Protocol/ABC)를 유일한 결합 지�
 ```text
 ┌────────────────────────────────────────────────────────────┐
 │                    runtime_core                            │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │ Observer │  │ Grounder │  │ Executor │  │ Verifier │  │
-│  │  (ABC)   │  │  (ABC)   │  │  (ABC)   │  │  (ABC)   │  │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  │
-│       │              │              │              │       │
-│  ┌────┴──────────────┴──────────────┴──────────────┴────┐  │
-│  │              Plugin Registry (Lazy Load)              │  │
-│  └──────────────────────────────────────────────────────┘  │
+│  Observer · Grounder · Executor · Verifier  (ABC only)    │
+│                    Plugin Registry                         │
 └────────────────────────────────────────────────────────────┘
-         ▲              ▲              ▲              ▲
-         │              │              │              │
-  ┌──────┴──────┐ ┌─────┴──────┐ ┌─────┴──────┐ ┌─────┴──────┐
-  │ browser     │ │ uia-win32  │ │ template   │ │ file-exists│
-  │ observer    │ │ observer   │ │ grounder   │ │ verifier   │
-  │ (plugin)    │ │ (plugin)   │ │ (plugin)   │ │ (plugin)   │
-  └─────────────┘ └────────────┘ └────────────┘ └────────────┘
+         ▲                 ▲                 ▲
+         │                 │                 │
+  ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐
+  │ Capture     │   │ Perception  │   │ Input       │
+  │ Backend ABC │   │ (공통, OS무관)│   │ Injector ABC│
+  └──────┬──────┘   └─────────────┘   └──────┬──────┘
+         │  OS 플러그인만 여기 등록            │
+  ┌──────┴───────────────────────────────────┴──────┐
+  │ windows / linux / macos / browser / remote       │
+  │  (각 패키지가 Capture + Structure + Input 구현)  │
+  └─────────────────────────────────────────────────┘
 ```
 
 ### 2.2 모듈 추가/삭제 계약
@@ -94,9 +92,12 @@ class Observer(ABC):
 # 등록
 registry.register("browser", lambda cfg: BrowserObserver(cfg, playwright=dep))
 registry.register("uia-win32", lambda cfg: Win32UIAObserver(cfg, backend=dep))
+registry.register("at-spi-linux", lambda cfg: LinuxAtSpiObserver(cfg, bus=dep))
+registry.register("ax-macos", lambda cfg: MacosAxObserver(cfg, ax=dep))
+registry.register("remote-vnc", lambda cfg: RemoteVncObserver(cfg, session=dep))
 
 # 사용 — core는 구체 구현을 모름
-observer: Observer = registry.get(platform)  # "browser" | "uia-win32"
+observer: Observer = registry.get(platform)
 ```
 
 ### 2.3 모듈 간 데이터 흐름과 메모리 효율성
@@ -137,8 +138,12 @@ class SceneDelta:
 
 공통 인터페이스가 재사용성을 어떻게 보장하는가:
 
-- **Observer ABC** 하나로 `browser`, `uia-win32`, `at-spi-linux`, `ax-macos`
-  모두 교체 가능. 제어 루프는 동일.
+- **Observer ABC** 하나로 `browser`, `uia-win32`, `at-spi-linux`, `ax-macos`,
+  `remote-vnc` 모두 교체 가능. 제어 루프는 동일.
+- **CaptureBackend ABC** 하나로 DXGI / ScreenCaptureKit / X11 / PipeWire /
+  CDP / VNC framebuffer를 교체. Perception은 백엔드를 모른다.
+- **InputInjector ABC** 하나로 SendInput / CGEvent / XTest·portal / CDP Input /
+  VNC pointer를 교체. Executor는 주입 방식을 모른다.
 - **Grounder ABC** 하나로 `semantic-text`, `template-match`, `ocr-position`
   전략을 조합하거나 개별 사용.
 - **Verifier ABC** 하나로 `ui-state`, `file-exists`, `api-response` 등
@@ -146,9 +151,90 @@ class SceneDelta:
 - **Gateway ABC** 하나로 `openai-compatible`, `anthropic`, `ollama` 등
   모든 모델 제공자를 교체 가능.
 
-플러그인 추가는 새 파일 하나를 `hpcu/<domain>/` 아래에 추가하고
+플러그인 추가는 새 패키지를 `hpcu/platform/<os>/` 아래에 추가하고
 부트스트랩에 `registry.register(...)` 한 줄을 추가하는 것으로 완료된다.
-플러그인 삭제는 register 호출을 제거하고 파일을 삭제하는 것으로 완료된다.
+플러그인 삭제는 register 호출을 제거하고 패키지를 삭제하는 것으로 완료된다.
+OS 모듈이 없어도 Perception·Grounder·Verifier·제어 루프는 동작해야 한다.
+
+### 2.5 3층 분리: Capture · Perception · Input
+
+화면을 다루는 코드는 **한 Observer에 몰지 않는다.** OS마다 다른 것과
+모든 화면에서 같은 것을 강제로 분리한다. 상세는 `03-observation-layer.md`.
+
+```text
+[OS별 플러그인]                    [공통 런타임]                 [OS별 플러그인]
+CaptureBackend ──FrameHandle──► Perception ──SceneDelta──► Executor
+StructureObserver ──tree──►        OCR/shape/template          │
+                                   Scene Graph fusion          ▼
+                                                          InputInjector
+                                                          (semantic 우선,
+                                                           physical fallback)
+```
+
+| 층 | 책임 | OS 코드 허용 | 산출물 |
+|---|---|---|---|
+| **Capture** | 픽셀 획득, dirty ROI 힌트, 해상도/DPI 메타 | 예 (필수) | `FrameHandle` |
+| **Structure** | DOM/AX/UIA/AT-SPI/AXUI 트리 | 예 (있으면) | 구조 요소 + native ref |
+| **Perception** | OCR, 형상, 템플릿, fusion, tracking | **금지** | `SceneDelta` |
+| **Input** | semantic action 또는 물리 마우스/키보드 | 예 (필수) | `ExecutionResult` |
+
+불변식:
+
+1. Perception·Scene Graph·Grounder는 `hpcu/platform/`을 import하지 않는다.
+2. Capture는 바이트를 복사하지 않고 `FrameHandle`만 넘긴다.
+3. Executor는 좌표를 직접 OS API에 넣지 않는다. `InputInjector`만 호출한다.
+4. 지원하지 않는 capability는 침묵하지 않고 `Capability.UNSUPPORTED`를 반환한다.
+5. 호스트 Linux, Docker Linux, Windows, macOS, 원격 VNC는 **같은 세 ABC**에
+   등록되는 서로 다른 플러그인일 뿐이다.
+
+### 2.6 CaptureBackend / InputInjector 계약
+
+```python
+class CaptureBackend(ABC):
+    @abstractmethod
+    async def start(self) -> None: ...
+
+    @abstractmethod
+    async def grab(self) -> FrameHandle:
+        """최신 프레임 handle. bytes 복사 금지."""
+        ...
+
+    @abstractmethod
+    def capabilities(self) -> CaptureCapabilities: ...
+
+
+class InputInjector(ABC):
+    @abstractmethod
+    async def semantic(self, action: Action, element: UIElement) -> ExecutionResult:
+        """UIA Invoke, AXPress, DOM click, AT-SPI action. 가능하면 이것만."""
+        ...
+
+    @abstractmethod
+    async def physical(self, action: Action, point: ScreenPoint) -> ExecutionResult:
+        """SendInput / CGEvent / XTest / portal / VNC. semantic 실패 시에만."""
+        ...
+
+    @abstractmethod
+    def capabilities(self) -> InputCapabilities: ...
+```
+
+등록 예:
+
+```python
+registry.register("capture.windows-dxgi", WindowsDxgiCapture)
+registry.register("capture.linux-x11", LinuxX11Capture)
+registry.register("capture.linux-pipewire", LinuxPipewireCapture)
+registry.register("capture.macos-sckit", MacosScreenCaptureKit)
+registry.register("capture.browser-cdp", BrowserCdpCapture)
+registry.register("capture.remote-vnc", RemoteVncCapture)
+
+registry.register("input.windows", WindowsInputInjector)
+registry.register("input.linux-xtest", LinuxXtestInjector)
+registry.register("input.linux-portal", LinuxPortalInjector)
+registry.register("input.macos-cgevent", MacosCgEventInjector)
+registry.register("input.browser-cdp", BrowserCdpInjector)
+registry.register("input.remote-vnc", RemoteVncInjector)
+```
 
 ## 3. 전체 흐름 다이어그램
 
@@ -194,7 +280,9 @@ flowchart TD
 | 컴포넌트 | 책임 | 상세 문서 |
 |---|---|---|
 | Planner | 사용자 목표 해석, 제약조건 확정, 작업 DAG 생성 | 02, 06 |
-| Observer | 화면·접근성 트리·DOM·윈도우 상태 수집 | 03 |
+| Observer | Capture+Structure facade. OS 플러그인 합성 | 03 |
+| CaptureBackend | 픽셀 획득. DXGI/X11/PipeWire/SCKit/CDP/VNC | 03 |
+| InputInjector | semantic 액션 또는 물리 마우스/키보드 | 03, 07 |
 | Scene Builder | 여러 관찰 소스를 하나의 UI 객체 그래프로 통합 | 05 |
 | Grounder | 자연어 조건을 실제 요소 ID로 연결 | 06 |
 | Executor | 클릭·입력·스크롤·선택·호출을 결정론적으로 실행 | 07 |
@@ -238,7 +326,7 @@ while not task.complete:
         task.pause_for_approval(action)
         continue
 
-    execution = executor.execute(action)
+    execution = executor.execute(action)  # 내부에서 InputInjector.semantic/physical
     verification = verifier.verify(node.postconditions, execution)
 
     if verification.success:
@@ -292,10 +380,11 @@ Verifier
 | 같은 프로세스 | typed channel |
 | 로컬 프로세스 간 | Unix domain socket / Windows named pipe |
 | 메타데이터 | protobuf (또는 MessagePack) |
-| 이미지 | shared memory handle |
+| 이미지 | shared memory handle (`FrameHandle`). 플랫폼 버퍼를 그대로 wrap |
 | 외부 API | HTTP/gRPC |
 | 모델 연결 | provider-independent adapter (HTTP/SSE) |
 | MCP | 외부 에이전트 노출용 선택 계층. 내부 hot path에 사용하지 않음 |
+| OS native | Capture/Input 플러그인 내부에서만. core는 native handle을 보지 않음 |
 
 ---
 
@@ -304,9 +393,11 @@ Verifier
 ### 8.1 MVP/프로토타입 (Phase 0~7 채택)
 
 - Python 3.12+
-- Playwright (브라우저)
-- pywinauto / UIA wrapper (Windows)
-- OpenCV (영상처리)
+- Playwright (브라우저 Capture/Structure/Input)
+- pywinauto / UIA wrapper (Windows Structure + semantic Input)
+- platform capture: DXGI / ScreenCaptureKit / X11·PipeWire / CDP / VNC
+- platform input: SendInput / CGEvent / XTest·ydotool·portal / CDP / VNC
+- OpenCV (영상처리 — OS 무관)
 - PaddleOCR (주 OCR) + Tesseract (fallback/비교)
 - SQLite (경험 저장소, trace 저장)
 - FastAPI 또는 local IPC (데몬 인터페이스)
@@ -320,8 +411,8 @@ Verifier
 
 ```text
 Rust Runtime Core
-├─ capture / input / scene graph / resolver / executor
-├─ platform-windows / linux / macos adapters
+├─ capture-abc / input-abc / scene graph / resolver / executor
+├─ platform-windows / linux / macos / remote adapters
 └─ browser-playwright adapter
 
 Python Vision Worker
@@ -348,9 +439,16 @@ dx-computer-use/
 │  └─ scene-inspector/      # 웹 기반 디버깅 UI
 ├─ hpcu/                    # 핵심 패키지 (crates 대응)
 │  ├─ runtime_core/         # 제어 루프, task DAG
-│  ├─ capture/              # 캡처 스레드, ring buffer, tile hash
-│  ├─ observation/          # browser/windows 어댑터 (platform-linux/macos는 Phase 8)
-│  ├─ vision/               # OCR, shape detection, template matching
+│  ├─ capture/              # CaptureBackend ABC, ring buffer, tile hash (공통)
+│  ├─ input/                # InputInjector ABC, 좌표 hit-test 계약 (공통)
+│  ├─ platform/             # OS 플러그인만. core가 여기 내부를 import하지 않음
+│  │  ├─ windows/           # DXGI capture, UIA structure, SendInput
+│  │  ├─ linux/             # X11/PipeWire capture, AT-SPI, XTest/portal
+│  │  ├─ macos/             # ScreenCaptureKit, AXUIElement, CGEvent
+│  │  ├─ browser/           # CDP/Playwright capture·structure·input
+│  │  └─ remote/            # VNC/RDP framebuffer capture + pointer/key
+│  ├─ observation/          # Observer facade (Capture+Structure 합성)
+│  ├─ vision/               # OCR, shape, template — OS 코드 금지
 │  ├─ scene_graph/          # 통합 그래프, 인덱스, tracking
 │  ├─ grounder/             # candidate scoring, confidence
 │  ├─ executor/             # Action DSL 실행
@@ -373,7 +471,8 @@ dx-computer-use/
 
 - `runtime_core`는 하위 모듈의 인터페이스(protocol/ABC)에만 의존
 - `gateway`는 HTTP/SSE만 알고, runtime 내부 타입을 import하지 않음 (DTO 변환은 router가 담당)
-- `vision`, `observation`은 `scene_graph`의 스키마에만 의존
+- `vision`은 `scene_graph` 스키마와 `FrameHandle`만 의존. `hpcu.platform` import 금지
+- `platform/*`만 native API, OS SDK, compositor portal을 호출한다
 - 순환 import 금지 — 위반 시 CI에서 검사
 
 ---
@@ -408,6 +507,13 @@ dx-computer-use/
 |---|---|
 | `docs/rules/naming-conventions.md` | 파일명, 디렉터리명, Python 식별자, JSON 키 네이밍 규칙 (kebab-case 강제) |
 | `docs/rules/testing-standards.md` | 테스트 계층 구조, 시뮬레이션/검증 프로세스, 커버리지 임계값, CI 게이트 |
+| `AGENTS.md` | 구현자가 먼저 읽는 방향·불변식 |
 
 본 문서에서 정의한 공통 인터페이스(ABC)와 플러그인 계약을 구현하는 모든 코드는
 위 규칙 문서를 준수해야 한다.
+
+문서 역할은 `00-overview-and-goals.md` §1.1. 이 문서가 소유하는 것은
+런타임 모듈 경계와 repo 위치다.
+
+관찰·캡처·입력 계약, capability matrix, 부트스트랩 선택, 권한은
+`03-observation-layer.md`만 수정한다. 여기서 표를 복제하지 않는다.

@@ -1,6 +1,6 @@
 ---
 title: "HPCU Runtime — 개발 태스크리스트"
-version: "1.0"
+version: "1.1"
 date: "2026-08-21"
 parent: "docs/plan/00-overview-and-goals.md, docs/dev-init-001.md §25"
 language: "ko-KR"
@@ -9,8 +9,9 @@ scope: "project-wide, progress tracking"
 
 # 개발 태스크리스트
 
-진행 관리 기준 문서. 각 태스크는 `docs/dev-init-001.md §25`의 Phase 정의와
-`docs/plan/01-system-architecture.md`의 모듈 구조를 따른다.
+진행 관리만 한다. 설계를 이 파일에서 바꾸지 않는다.
+Phase 이름·범위는 `docs/dev-init-001.md` §25 / 향후 `12-roadmap-phases.md`.
+모듈 위치는 `01-system-architecture.md`. 관찰 계약은 `03-observation-layer.md`.
 
 체크 규칙:
 
@@ -73,12 +74,29 @@ stale action을 식별하며, 동일 trace를 offline replay 할 수 있다.
 - [x] 동일 trace offline replay 가능
 - [x] 라인 커버리지 ≥ 85%, 브랜치 ≥ 80%
 
+### P0-6 크로스 OS 계약 (Capture / Input / Capability)
+
+ABC는 OS 구현보다 먼저 고정한다. 구현체는 fake로 테스트한다.
+
+- [ ] `hpcu/capture/backend.py` — `CaptureBackend` ABC, `CaptureCapabilities`, `FrameHandle`
+- [ ] `hpcu/input/injector.py` — `InputInjector` ABC, `InputCapabilities`
+- [ ] `hpcu/schemas/capability.py` — `Capability` enum (`supported`/`degraded`/`unsupported`)
+- [ ] 실패 코드 추가: `CAPTURE_PERMISSION_DENIED`, `CAPTURE_BACKEND_UNAVAILABLE`,
+      `STRUCTURE_TREE_EMPTY`, `INPUT_PERMISSION_DENIED`, `INPUT_SEMANTIC_UNSUPPORTED`,
+      `INPUT_PHYSICAL_UNSUPPORTED`, `CAPABILITY_MISSING`
+- [ ] `hpcu/platform/` 패키지 골격 (`windows/`, `linux/`, `macos/`, `browser/`, `remote/`)
+      — 각 `__init__`만, native import 없음
+- [ ] fake capture/input으로 ABC 계약 테스트 (bytes 복사 금지, session_id 결합)
+- [ ] `vision`이 `hpcu.platform`을 import하면 실패하는 lint/테스트
+
 ---
 
 ## Phase 1 — 브라우저 결정론적 Vertical Slice
 
 - [x] P1-1 `Observer` ABC + `PluginRegistry` (lazy load, 생성자 주입)
+- [ ] P1-1b Observer facade = CaptureBackend + StructureObserver 합성, session_id 묶음
 - [x] P1-2 Playwright adapter — accessibility snapshot
+      (`hpcu.platform.browser`: CDP capture + DOM structure + CDP input)
 - [ ] P1-3 role/name/label locator + selector ensemble
 - [ ] P1-4 DOM/AX → Scene Graph 변환
 - [x] P1-5 Action DSL 실행기: click/type/select/wait_until/assert
@@ -91,20 +109,25 @@ stale action을 식별하며, 동일 trace를 offline replay 할 수 있다.
 
 ## Phase 2 — Windows Structured UI
 
-- [ ] P2-1 UIA tree observer
-- [ ] P2-2 Invoke/Value/Selection/Toggle 패턴
+`hpcu.platform.windows`가 Capture + Structure + Input 세 ABC를 구현한다.
+
+- [ ] P2-1 UIA tree observer (`StructureObserver`)
+- [ ] P2-1b DXGI Desktop Duplication capture (`CaptureBackend`, dirty rect)
+- [ ] P2-2 Invoke/Value/Selection/Toggle 패턴 (`InputInjector.semantic`)
 - [ ] P2-3 window focus 및 app lifecycle 관리
 - [ ] P2-4 UIA event 구독
 - [ ] P2-5 per-monitor coordinate normalization
-- [ ] P2-6 semantic action 실패 시 input fallback
+- [ ] P2-6 semantic 실패 시 `InputInjector.physical` (SendInput) fallback
 - [ ] 완료 조건: Win32/WPF/WinUI 샘플에서 공통 DSL 동작, 125%/150% DPI 통과
 
 ---
 
 ## Phase 3 — CPU Screen Perception
 
-- [ ] P3-1 고속 capture + ring buffer
-- [ ] P3-2 dirty ROI / tile hash
+Perception은 OS 무관. 캡처 스레드/ring buffer는 공통, grab은 fake 또는 등록된 backend.
+
+- [ ] P3-1 고속 capture 파이프라인 + ring buffer (`hpcu/capture`, backend 교체 가능)
+- [ ] P3-2 dirty ROI / tile hash (백엔드 dirty_rects가 없으면 이 경로)
 - [ ] P3-3 OCR (PaddleOCR 주, Tesseract fallback)
 - [ ] P3-4 shape/component detector
 - [ ] P3-5 template matcher
@@ -167,17 +190,27 @@ stale action을 식별하며, 동일 trace를 offline replay 할 수 있다.
 
 ## Phase 8 — Linux/macOS 및 원격 화면
 
-- [ ] P8-1 AT-SPI adapter
-- [ ] P8-2 AXUIElement adapter
-- [ ] P8-3 Wayland/X11 정책
-- [ ] P8-4 remote desktop capture/input adapter
-- [ ] P8-5 권한 설치 가이드 + capability matrix
-- [ ] 완료 조건: 동일 Action DSL이 플랫폼별 adapter에서 실행
+Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
+
+- [ ] P8-1 Linux X11 Capture + AT-SPI Structure + XTest Input
+      (호스트와 Docker Xvfb 동일 플러그인, DISPLAY만 다름)
+- [ ] P8-2 macOS ScreenCaptureKit Capture + AXUIElement Structure + CGEvent Input
+- [ ] P8-3 Wayland: PipeWire capture + input portal. 거부 시 우회 금지,
+      `CAPTURE_PERMISSION_DENIED` / `INPUT_PERMISSION_DENIED`
+- [ ] P8-4 remote VNC/RDP Capture + RFB Input, Structure는 empty가 정상
+- [ ] P8-5 각 패키지 `probe()` + `permissions.md` + capability matrix 실측
+- [ ] P8-6 capture와 input이 다른 화면을 가리키면 부팅 실패 (session_id)
+- [ ] P8-7 Linux/macOS 패키지 제거 후 `tests/unit` + vision 테스트 통과
+- [ ] 완료 조건: 동일 Action DSL이 플랫폼별 adapter에서 실행,
+      unsupported capability는 명시 거절
 
 ---
 
 ## 문서 태스크 (병행)
 
-- [ ] `docs/plan/02-schemas-and-coordinates.md` ~ `12-roadmap-phases.md` 작성
-- [ ] `docs/decisions/` ADR 기록 시작
+- [x] `docs/plan/03-observation-layer.md` 작성 (Capture/Structure/Perception/Input)
+- [ ] `docs/plan/02-schemas-and-coordinates.md`, `04`~`12` 작성
+- [x] `docs/decisions/001-three-layer-platform.md`
+- [x] `AGENTS.md` (방향·불변식)
 - [ ] Phase 종료 시 가정·수치를 실측값으로 교체
+- [ ] capability matrix를 실측 후 03 §8 갱신
