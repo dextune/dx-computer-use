@@ -12,6 +12,9 @@ language: "ko-KR"
 
 > 화면은 OS마다 다르게 **얻고**, 같게 **이해하고**, OS마다 다르게 **누른다.**
 > 공통 런타임은 픽셀과 트리를 해석한다. OS 플러그인은 버퍼와 입력을 소유한다.
+>
+> `Observer.observe()`의 산출은 `SceneDelta`(added/removed/modified) 하나다.
+> `ObservationDelta` 스냅샷 필드는 쓰지 않는다.
 
 대상 화면은 다음 중 하나다. 모두 같은 ABC에 등록된다.
 
