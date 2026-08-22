@@ -1,15 +1,17 @@
-"""Case data adapter that produces typed planning context, not actions."""
+"""Case data adapters that produce planning context and PlanIR entry nodes."""
 
 from __future__ import annotations
 
 from hpcu.compiler.targeting_compiler import TargetingCompiler
 from hpcu.gateway.gateway import Gateway
+from hpcu.planning.plan_compiler import PlanCompiler
 from hpcu.runtime_core.product_runtime import CommandRequest
 from hpcu.runtime_core.task_budget import TaskBudgetLedger
-from hpcu.schemas.action import ActionOp
+from hpcu.schemas.action import Action, ActionOp, Postcondition, PostconditionKind
+from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.goal import GoalEnvelope, IntentKind
-from hpcu.schemas.plan import PlanningContext, TargetQuerySpec
+from hpcu.schemas.plan import PlanIR, PlanningContext, PlanNode, TargetQuerySpec
 from hpcu.schemas.strategy import StrategyPlan
 
 _LOCAL_OPS = frozenset(
@@ -38,6 +40,75 @@ _INTERACTION_OPS = frozenset(
         ActionOp.REQUEST_APPROVAL,
     }
 )
+
+
+class CasePlanCompiler(PlanCompiler):
+    """Prepend data-defined browser entry to the common intent plan."""
+
+    def compile(
+        self,
+        goal: GoalEnvelope,
+        strategy: StrategyPlan,
+        context: PlanningContext,
+        task_budget: TaskBudgetSpec | None = None,
+    ) -> PlanIR:
+        plan = super().compile(goal, strategy, context, task_budget)
+        entry_url = context.values.get("entry_url", "").strip()
+        if not entry_url or goal.intent is IntentKind.NAVIGATE:
+            return plan
+        if ActionOp.NAVIGATE not in context.allowed_ops:
+            raise ValueError("case entry requires NAVIGATE capability")
+        if ActionOp.NAVIGATE in goal.forbidden_actions:
+            raise ValueError("case entry navigation is forbidden by the goal")
+
+        surface = context.require_query("surface")
+        ready = context.require_query("entry_ready")
+        nodes = dict(plan.nodes)
+        if "enter-case-url" in nodes or "verify-case-entry" in nodes:
+            raise ValueError("case entry node id collides with the intent plan")
+        nodes["enter-case-url"] = PlanNode(
+            id="enter-case-url",
+            action=Action(
+                id="enter-case-url",
+                op=ActionOp.NAVIGATE,
+                value=entry_url,
+                postconditions=(
+                    Postcondition(
+                        kind=PostconditionKind.ELEMENT_VISIBLE,
+                        target="$verify",
+                    ),
+                ),
+            ),
+            surface=strategy.surface,
+            target_query=surface,
+            verification_query=ready,
+            success_edge="verify-case-entry",
+        )
+        nodes["verify-case-entry"] = PlanNode(
+            id="verify-case-entry",
+            action=Action(
+                id="verify-case-entry",
+                op=ActionOp.ASSERT,
+                postconditions=(
+                    Postcondition(
+                        kind=PostconditionKind.ELEMENT_VISIBLE,
+                        target="$target",
+                    ),
+                ),
+            ),
+            surface=strategy.surface,
+            target_query=ready,
+            success_edge=plan.entry_node_id,
+        )
+        return PlanIR(
+            goal=plan.goal,
+            strategy_id=plan.strategy_id,
+            entry_node_id="enter-case-url",
+            nodes=nodes,
+            task_budget=plan.task_budget,
+            compiler_version=f"{plan.compiler_version}-case-entry",
+            patch_lineage=plan.patch_lineage,
+        )
 
 
 class CasePlanningContextProvider:
