@@ -1,17 +1,22 @@
 """MiniMax M3 adapter — OpenAI-compatible chat completions over httpx.
 
-Handles the two MiniMax-specific quirks observed in production:
+Handles MiniMax-specific response quirks observed in production:
 
-- reasoning is serialised INSIDE `message.content` as a
-  ` thinking... response` block, which must be stripped before use;
-- the reasoning block can split across chunks, so `strip_thinking` uses a
-  small state machine rather than a naive split.
+- reasoning may be serialised inside ``message.content`` as a legacy
+  `` thinking... response`` block or XML-style thinking tags;
+- JSON may be wrapped in markdown/prose;
+- non-authoritative ``reason_code`` metadata may be emitted as JSON null.
 
-`httpx` is only imported when a client is not injected, so unit tests can
-inject a fake client and never touch the network.
+The adapter removes only provider presentation noise and normalizes nullable
+provider diagnostics. Action-bearing fields remain untouched and are still
+validated by the provider-neutral decision schema.
+
+``httpx`` is imported only when a client is not injected, so unit tests can
+use a fake client without network access.
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +28,9 @@ _THINK_START = " thinking"
 _THINK_END = " response"
 _DEFAULT_BASE_URL = "https://api.minimax.io/v1"
 _DEFAULT_MODEL = "MiniMax-M3"
+_REASON_CODE_NULL = re.compile(
+    r'("reason_code"\s*:\s*)null(?=\s*[,}])'
+)
 
 
 def strip_thinking(content: str) -> str:
@@ -31,10 +39,8 @@ def strip_thinking(content: str) -> str:
     MiniMax responses may contain legacy `` thinking``/`` response`` blocks,
     XML-style ``<think>`` blocks, or a fenced JSON object. These are transport
     quirks of this concrete adapter; the common decision parser still receives
-    one strict JSON object and rejects anything else.
+    strict JSON candidates and performs schema-directed selection.
     """
-    import re
-
     content = re.sub(
         r"<think(?:ing)?\b[^>]*>.*?</think(?:ing)?>",
         "",
@@ -49,7 +55,7 @@ def strip_thinking(content: str) -> str:
     )
     # Some MiniMax responses omit the legacy `` thinking`` marker but still
     # prepend prose before the JSON object. This transport cleanup stays in
-    # the concrete adapter; the common parser remains schema-strict.
+    # the concrete adapter; schema selection remains provider-neutral.
     first_object = content.find("{")
     if first_object > 0:
         content = content[first_object:]
@@ -82,8 +88,24 @@ def strip_thinking(content: str) -> str:
     return "".join(output)
 
 
+def normalize_nullable_diagnostics(content: str) -> str:
+    """Normalize MiniMax's nullable audit metadata, not decision semantics.
+
+    The 2026-08-22 reliability run contained an otherwise valid reanalysis
+    object with ``"reason_code": null``. ``reason_code`` is diagnostic only;
+    it does not choose an action, target, scene, goal state, or confidence.
+    Replacing this one provider-specific null with a stable marker prevents a
+    false schema failure while preserving fail-closed validation for every
+    action-bearing field.
+    """
+    return _REASON_CODE_NULL.sub(
+        r'\1"provider_unspecified"',
+        content,
+    )
+
+
 def schema_validate(response: dict, expected_schema: dict) -> bool:
-    """Return True when `response` conforms to the JSON schema.
+    """Return True when ``response`` conforms to the JSON schema.
 
     A malformed schema itself is treated as invalid (returns False) rather
     than raising.
@@ -114,10 +136,9 @@ class MiniMaxAdapter(Gateway):
     ):
         """Initialize the adapter.
 
-        `client` is any object with a `.post(url, headers=..., json=...)`
-        method returning an object with `.raise_for_status()` and `.json()`.
-        When None, a synchronous `httpx.Client` is created (the only place
-        httpx is imported).
+        ``client`` is any object with a ``.post(url, headers=..., json=...)``
+        method returning an object with ``.raise_for_status()`` and ``.json()``.
+        When None, a synchronous ``httpx.Client`` is created.
         """
         if not api_key:
             raise ValueError("api_key must not be empty")
@@ -149,7 +170,7 @@ class MiniMaxAdapter(Gateway):
         *,
         purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
     ) -> GatewayResponse:
-        """Invoke MiniMax-M3 and return a thinking-stripped response."""
+        """Invoke MiniMax-M3 and return normalized provider content."""
         if not isinstance(purpose, ModelCallPurpose):
             raise ValueError("purpose must be a ModelCallPurpose")
         import time
@@ -179,7 +200,7 @@ class MiniMaxAdapter(Gateway):
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         content = data["choices"][0]["message"]["content"]
-        content = strip_thinking(content)
+        content = normalize_nullable_diagnostics(strip_thinking(content))
         tokens_used = int(data.get("usage", {}).get("total_tokens", 0))
 
         response_model = data.get("model", self._model)
@@ -202,7 +223,7 @@ class MiniMaxAdapter(Gateway):
         env_path: Optional[Path] = None,
         timeout_s: float = 30.0,
     ) -> "MiniMaxAdapter":
-        """Build an adapter using MINIMAX_API_KEY from the environment or `.env`."""
+        """Build an adapter using MINIMAX_API_KEY from environment or ``.env``."""
         api_key = load_minimax_api_key(env_path=env_path)
         if not api_key:
             raise ValueError("MINIMAX_API_KEY is not set")
@@ -215,7 +236,7 @@ class MiniMaxAdapter(Gateway):
 
 
 def load_minimax_api_key(*, env_path: Optional[Path] = None) -> str:
-    """Read MINIMAX_API_KEY from os.environ, then repo `.env`. Never logs the value."""
+    """Read MINIMAX_API_KEY from environment, then repo ``.env``."""
     existing = os.environ.get("MINIMAX_API_KEY", "").strip()
     if existing:
         return existing

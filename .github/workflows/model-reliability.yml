@@ -1,0 +1,59 @@
+name: model-reliability
+
+on:
+  push:
+    branches:
+      - codex/model-reliability-5x-20260823
+  pull_request:
+    paths:
+      - "hpcu/**"
+      - "tests/**"
+      - "config/**"
+      - ".github/workflows/model-reliability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Lint touched reliability modules
+        run: >-
+          python -m ruff check
+          hpcu/gateway
+          hpcu/schemas/decision.py
+          hpcu/compiler/targeting_compiler.py
+          hpcu/cases/__main__.py
+          tests/unit/test_decision.py
+          tests/unit/test_targeting.py
+          tests/unit/test_minimax_adapter.py
+          tests/unit/test_gateway.py
+          tests/unit/test_cases.py
+          tests/unit/test_model_response_framing.py
+          tests/unit/test_targeting_compiler_reliability.py
+          tests/unit/test_gateway_assembly.py
+          tests/unit/test_run_manifest.py
+          tests/unit/test_minimax_diagnostic_normalization.py
+      - name: Focused tests
+        run: >-
+          python -m pytest -q
+          tests/unit/test_decision.py
+          tests/unit/test_targeting.py
+          tests/unit/test_minimax_adapter.py
+          tests/unit/test_gateway.py
+          tests/unit/test_cases.py
+          tests/unit/test_model_response_framing.py
+          tests/unit/test_targeting_compiler_reliability.py
+          tests/unit/test_gateway_assembly.py
+          tests/unit/test_run_manifest.py
+          tests/unit/test_minimax_diagnostic_normalization.py
