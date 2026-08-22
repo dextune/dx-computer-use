@@ -207,19 +207,33 @@ class PlanIR:
         if patch.parent_plan_hash != self.plan_hash:
             raise ValueError("plan patch parent hash does not match current plan")
         completed = set(completed_node_ids)
+        current_ids = set(self.nodes)
         replaced = set(patch.replaced_node_ids)
-        unknown_replacements = replaced - set(self.nodes)
+        patch_ids = set(patch.nodes)
+        unknown_replacements = replaced - current_ids
         if unknown_replacements:
             raise ValueError(
                 f"plan patch replaces unknown nodes: {sorted(unknown_replacements)!r}"
             )
-        if completed - set(self.nodes):
+        if completed - current_ids:
             raise ValueError("completed node set is not part of the current plan")
         if completed & replaced:
             raise ValueError("plan patch cannot replace a verified completed node")
-        for node_id in completed:
-            if node_id in patch.nodes and patch.nodes[node_id] != self.nodes[node_id]:
-                raise ValueError("plan patch cannot modify a completed node")
+        overwritten_without_declaration = (patch_ids & current_ids) - replaced
+        if overwritten_without_declaration:
+            raise ValueError(
+                "plan patch must declare every overwritten current node as replaced"
+            )
+        if patch.resume_node_id in completed:
+            raise ValueError("plan patch cannot resume at a verified completed node")
+        for node in patch.nodes.values():
+            outgoing = set(node.failure_edges.values())
+            if node.success_edge is not None:
+                outgoing.add(node.success_edge)
+            if outgoing & completed:
+                raise ValueError(
+                    "plan patch cannot introduce an edge to a verified completed node"
+                )
 
         nodes = dict(self.nodes)
         for node_id in replaced:
@@ -279,6 +293,8 @@ class PlanPatch:
         if len(set(self.replaced_node_ids)) != len(self.replaced_node_ids):
             raise ValueError("plan patch replaced_node_ids must be unique")
         nodes = dict(self.nodes)
+        if not self.replaced_node_ids and not nodes:
+            raise ValueError("plan patch must replace or add at least one node")
         for key, node in nodes.items():
             if key != node.id:
                 raise ValueError("PlanPatch mapping keys must equal PlanNode.id")
