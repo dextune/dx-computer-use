@@ -208,6 +208,13 @@ class PlanIR:
             raise ValueError("plan patch parent hash does not match current plan")
         completed = set(completed_node_ids)
         replaced = set(patch.replaced_node_ids)
+        unknown_replacements = replaced - set(self.nodes)
+        if unknown_replacements:
+            raise ValueError(
+                f"plan patch replaces unknown nodes: {sorted(unknown_replacements)!r}"
+            )
+        if completed - set(self.nodes):
+            raise ValueError("completed node set is not part of the current plan")
         if completed & replaced:
             raise ValueError("plan patch cannot replace a verified completed node")
         for node_id in completed:
@@ -216,13 +223,12 @@ class PlanIR:
 
         nodes = dict(self.nodes)
         for node_id in replaced:
-            nodes.pop(node_id, None)
+            nodes.pop(node_id)
         nodes.update(patch.nodes)
         if patch.resume_node_id not in nodes:
             raise ValueError("plan patch resume node does not exist")
         return replace(
             self,
-            entry_node_id=patch.resume_node_id,
             nodes=nodes,
             patch_lineage=(*self.patch_lineage, patch.patch_hash),
         )
