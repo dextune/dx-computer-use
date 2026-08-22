@@ -21,9 +21,6 @@ def _bbox(x: float, y: float, width: float, height: float) -> BoundingBox:
     return BoundingBox(space=SPACE, x=x, y=y, width=width, height=height)
 
 
-# ── TargetingPack construction ──────────────────────────────────────
-
-
 @pytest.mark.unit
 def test_targeting_pack_construction():
     pack = TargetingPack(
@@ -78,14 +75,8 @@ def test_targeting_pack_is_frozen():
         pack.goal_id = "mutated"  # type: ignore[misc]
 
 
-# ── GoalFallbackTokenizer ───────────────────────────────────────────
-
-
 @pytest.mark.unit
 def test_fallback_tokenizer_brand_in_goal_not_hardcoded():
-    """GoalFallbackTokenizer must NOT consult a hardcoded dictionary.
-    The token '쿠팡' appears only because the goal string contains it.
-    """
     tokenizer = GoalFallbackTokenizer()
     pack = tokenizer.tokenize("case-1", "쿠팡에서 생수 골라줘")
     assert "쿠팡에서" in pack.ready_any
@@ -98,7 +89,6 @@ def test_fallback_tokenizer_brand_in_goal_not_hardcoded():
 
 @pytest.mark.unit
 def test_fallback_tokenizer_unknown_brand():
-    """A brand not in any code dictionary still produces tokens."""
     tokenizer = GoalFallbackTokenizer()
     pack = tokenizer.tokenize("case-2", "XYZ마트에서 우유 사줘")
     assert "XYZ마트에서" in pack.ready_any
@@ -110,7 +100,7 @@ def test_fallback_tokenizer_unknown_brand():
 def test_fallback_tokenizer_filters_short_tokens():
     tokenizer = GoalFallbackTokenizer()
     pack = tokenizer.tokenize("case-3", "a b c d e 한글")
-    single_char = [t for t in pack.ready_any if len(t) < 2]
+    single_char = [token for token in pack.ready_any if len(token) < 2]
     assert single_char == []
     assert "한글" in pack.ready_any
 
@@ -121,9 +111,6 @@ def test_fallback_tokenizer_empty_goal():
     pack = tokenizer.tokenize("case-4", "   ")
     assert len(pack.ready_any) >= 1
     assert pack.ready_any[0] == ""
-
-
-# ── GenericMatcher ──────────────────────────────────────────────────
 
 
 def _scene(*elements: UIElement) -> Scene:
@@ -163,7 +150,6 @@ def test_mentions_empty_tokens_is_true():
 
 @pytest.mark.unit
 def test_mentions_normalizes_hangul_spaces():
-    """Tesseract inserts spaces between Hangul syllables — normalize first."""
     scene = _scene(_element("e1", "쿠 팡 프 레 시"))
     assert mentions(scene, ("쿠팡",)) is True
 
@@ -249,7 +235,6 @@ def test_matcher_skips_elements_without_bbox():
 
 @pytest.mark.unit
 def test_same_scene_different_pack_different_outcome():
-    """Contract: same scene, different pack -> different matching outcomes."""
     scene = _scene(
         _element("e1", "생수 12,900원"),
         _element("e2", "동의하고 계속"),
@@ -273,13 +258,7 @@ def test_same_scene_different_pack_different_outcome():
     assert len(matcher_b.pick_candidates(scene)) == 0
 
 
-# ── TargetingCompiler (T2) ──────────────────────────────────────────
-
-
-
 class _FakeGateway(Gateway):
-    """Fake gateway for compiler tests — no real MiniMax calls."""
-
     def __init__(self, content: str = "", error: bool = False):
         self.content = content
         self.error = error
@@ -314,9 +293,18 @@ class _FakeGateway(Gateway):
         )
 
 
+def _valid_targeting_json(*, pick_required: str = "true") -> str:
+    return (
+        '{"ready_any":["쿠팡"],"success_any":["장바구니"],'
+        '"forbid_any":["결제"],"pick_query":"생수",'
+        f'"pick_required":{pick_required},'
+        '"dismiss_any":["동의"],"blocked_any":["captcha"],'
+        '"ignore_any":["광고"]}'
+    )
+
+
 @pytest.mark.unit
 def test_compiler_valid_json_response():
-    """Compiler accepts valid JSON and returns a model-sourced pack."""
     inner = _FakeGateway(
         content='{"ready_any":["쿠팡","원"],"success_any":["장바구니"],'
         '"forbid_any":["결제"],"pick_query":"생수","pick_required":true,'
@@ -339,7 +327,6 @@ def test_compiler_valid_json_response():
 
 @pytest.mark.unit
 def test_compiler_no_gateway_falls_back():
-    """Compiler without a gateway uses fallback tokenizer."""
     compiler = TargetingCompiler()
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
     assert pack.source == "goal_tokens"
@@ -348,7 +335,6 @@ def test_compiler_no_gateway_falls_back():
 
 @pytest.mark.unit
 def test_compiler_broken_json_falls_back():
-    """Broken JSON response triggers fallback, not crash."""
     inner = _FakeGateway(content="not valid json at all {{{")
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
@@ -359,7 +345,6 @@ def test_compiler_broken_json_falls_back():
 
 @pytest.mark.unit
 def test_compiler_gateway_error_falls_back():
-    """Gateway exception triggers fallback, not crash."""
     inner = _FakeGateway(error=True)
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
@@ -369,11 +354,10 @@ def test_compiler_gateway_error_falls_back():
 
 
 @pytest.mark.unit
-def test_compiler_strips_thinking_tags():
-    """Content between <thinking> tags is stripped before JSON parsing."""
+def test_compiler_ignores_reasoning_text_before_unique_object():
     inner = _FakeGateway(
-        content='<thinking>I should pick these tokens</thinking>'
-        '{"ready_any":["쿠팡"],"pick_query":"생수"}'
+        content="<thinking>I should pick these tokens</thinking>"
+        + _valid_targeting_json()
     )
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
@@ -385,10 +369,7 @@ def test_compiler_strips_thinking_tags():
 
 @pytest.mark.unit
 def test_compiler_rejects_non_boolean_pick_required():
-    inner = _FakeGateway(
-        content='{"ready_any":["ready"],"success_any":["done"],'
-        '"pick_query":"item","pick_required":"false"}'
-    )
+    inner = _FakeGateway(content=_valid_targeting_json(pick_required='"false"'))
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "item을 열어줘")
@@ -397,21 +378,17 @@ def test_compiler_rejects_non_boolean_pick_required():
 
 @pytest.mark.unit
 def test_compiler_schema_mismatch_falls_back():
-    """Response with missing required fields falls back gracefully."""
     inner = _FakeGateway(content='{"unknown_field": "value"}')
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    # Valid JSON with no targeting fields produces model pack with defaults
-    assert pack.source == "model"
-    assert pack.ready_any == ()
-    assert pack.pick_query == ""
+    assert pack.source == "goal_tokens"
+    assert "생수" in pack.ready_any
 
 
 @pytest.mark.unit
 def test_compiler_non_dict_response_falls_back():
-    """Non-dict JSON (e.g., a list) falls back."""
-    inner = _FakeGateway(content='[1, 2, 3]')
+    inner = _FakeGateway(content="[1, 2, 3]")
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
