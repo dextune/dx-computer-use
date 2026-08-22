@@ -20,3 +20,20 @@ tier_budget:
 policy:
   high_risk_require_approval: true
   max_retry_attempts: 3
+
+perception:
+  ocr_languages: kor+eng
+  ocr_psm: 6
+  ocr_sparse_psm: 11
+  ocr_min_regions_for_dense: 8
+  line_y_tolerance_px: 8
+
+targeting:
+  max_tokens_per_field: 8
+  min_token_length: 2
+
+cases:
+  navigate_settle_timeout_ms: 8000
+  navigate_poll_interval_ms: 400
+  post_click_timeout_ms: 5000
+  post_click_poll_interval_ms: 300

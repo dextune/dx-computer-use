@@ -213,6 +213,7 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [x] `docs/plan/03-observation-layer.md` 작성 (Capture/Structure/Perception/Input)
 - [x] `docs/plan/02-schemas-and-coordinates.md`, `04`~`12` 작성
 - [x] `docs/plan/13-common-pipeline-remediation.md` (공통 파이프 개선 계획)
+- [x] `docs/plan/14-goal-compiled-targeting.md` (목표 편찬 Targeting Pack)
 - [x] `docs/decisions/001-three-layer-platform.md`
 - [x] `AGENTS.md` (방향·불변식)
 - [ ] Phase 종료 시 가정·수치를 실측값으로 교체
@@ -231,3 +232,15 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [x] R4 `FrameHandle.space: CoordinateSpace`, Scene 불변 mapping, compiler가 실제 `ActionOp`/Enum
 - [x] R5 `ApprovalGate`/`WorkflowVersions` 개명, 전 unit 마커, settle이 config 기반
 - [x] R6 tasklist `[x]` 정직화 (Playwright/OCR/native stub vs 실기 분리)
+
+---
+
+## Targeting Pack (T1~T5)
+
+설계는 `docs/plan/14-goal-compiled-targeting.md`. 여기서 설계를 바꾸지 않는다.
+
+- [x] T1 TargetingPack + GenericMatcher + GoalFallbackTokenizer (모델 0, unit)
+- [x] T2 TargetingCompiler + CountingGateway (fake MiniMax, MiniMax-M3)
+- [x] T3 Runner가 pack만 사용. 프로덕션 사이트/CTA 사전 삭제
+- [x] T4 케이스 YAML은 goal+url+예산만
+- [x] T5 compile/grounding 횟수 분리, 시크릿 미누출

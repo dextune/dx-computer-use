@@ -1,0 +1,84 @@
+# Ten computer-use cases. Success is on-screen evidence, not model prose.
+# Pack-based: only id, goal, url, budget.  No site-specific keywords.
+# Evidence is compiled at plan-time from the goal by MiniMax-M3 or fallback.
+
+cases:
+  - id: coupang-fresh-popular
+    goal: 쿠팡에서 쿠팡 프레시 카테고리에서 인기있는 상품 1개 골라줘
+    start_url: "https://www.coupang.com/np/categories/194276"
+    evidence:
+      require_pick: true
+    max_attempts: 6
+    max_minimax_calls: 2
+
+  - id: google-search-notebook
+    goal: 구글에서 200만원 이하 노트북을 검색해줘
+    start_url: "https://www.google.com/search?q=laptop+notebook+under+2000000+KRW"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 2
+
+  - id: youtube-search-lofi
+    goal: 유튜브에서 lofi 음악을 찾아줘
+    start_url: "https://www.youtube.com/results?search_query=lofi+hip+hop"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 2
+
+  - id: wikipedia-seoul
+    goal: 위키피디아에서 Seoul 문서를 열어줘
+    start_url: "https://en.wikipedia.org/wiki/Seoul"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: bbc-news
+    goal: BBC 뉴스 메인 페이지를 열어줘
+    start_url: "https://www.bbc.com/news"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: duckduckgo-linux
+    goal: DuckDuckGo에서 linux를 검색해줘
+    start_url: "https://duckduckgo.com/?q=linux"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: github-explore
+    goal: GitHub Explore 페이지를 열어줘
+    start_url: "https://github.com/explore"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: wikipedia-python
+    goal: 위키피디아에서 Python 프로그래밍 문서를 열어줘
+    start_url: "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: mdn-javascript
+    goal: MDN에서 JavaScript 문서를 열어줘
+    start_url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
+    evidence:
+      require_pick: false
+    max_attempts: 4
+    max_minimax_calls: 1
+
+  - id: example-org
+    goal: example.org 안내 페이지를 열어줘
+    start_url: "https://example.org"
+    evidence:
+      require_pick: false
+    max_attempts: 3
+    max_minimax_calls: 0
