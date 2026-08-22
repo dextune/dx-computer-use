@@ -1,4 +1,4 @@
-"""Redacted action logs and provider-neutral semantic call counters."""
+"""Redacted action, semantic-call, and independent-evidence statistics."""
 
 from __future__ import annotations
 
@@ -31,6 +31,24 @@ class AiCallRecord:
     response_tokens: int = 0
     latency_ms: int = 0
     error: str = ""
+
+
+@dataclass(frozen=True)
+class EvidenceRecord:
+    """Redacted binding for one independently verified requirement."""
+
+    requirement: str
+    node_id: str
+    element_id: str
+    scene_version: int
+    frame_id: str
+    role: str
+    fingerprint: str
+    observed_text_sha256: str
+    observed_text_length: int
+    visible: bool
+    enabled: bool
+    selected: bool
 
 
 @dataclass
@@ -88,6 +106,7 @@ class CaseStats:
     evidence_frame_id: str = ""
     evidence_tokens: list[str] = field(default_factory=list)
     evidence_element_ids: list[str] = field(default_factory=list)
+    evidence_bindings: list[EvidenceRecord] = field(default_factory=list)
     stale_rejection_count: int = 0
     reanalysis_count: int = 0
     elapsed_ms: int = 0

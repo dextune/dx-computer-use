@@ -5,6 +5,7 @@ import pytest
 from hpcu.capture.frame_store import FrameStore
 from hpcu.executor.executor import Executor
 from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
+from hpcu.grounder.grounder import GroundingCandidate, GroundingResult
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.planning.goal_interpreter import GoalInterpreter
 from hpcu.planning.plan_compiler import PlanCompiler
@@ -27,7 +28,7 @@ from hpcu.schemas.plan import TargetQuerySpec
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.strategy import CapabilitySnapshot
 from hpcu.schemas.surface import ExecutionMode, SurfaceKind
-from hpcu.schemas.ui_element import ElementSource, UIElement
+from hpcu.schemas.ui_element import ElementSource, ElementState, UIElement
 
 pytestmark = pytest.mark.unit
 
@@ -148,19 +149,23 @@ def test_semantic_slot_filler_only_returns_unresolved_fields():
     inner = _SlotGateway()
     ledger = TaskBudgetLedger(
         TaskBudgetSpec(
-            max_model_calls=1, max_model_tokens=10, max_model_latency_ms=50
+            max_model_calls=1,
+            max_model_tokens=10,
+            max_model_latency_ms=50,
         )
     )
     filler = SemanticSlotFiller(BudgetedGateway(inner, ledger))
     goal = GoalInterpreter().interpret(
-        "이 작업을 처리해줘", semantic_fill=filler, model_call_budget=1
+        "이 작업을 처리해줘",
+        semantic_fill=filler,
+        model_call_budget=1,
     )
     assert goal.intent is IntentKind.NAVIGATE
     assert goal.ambiguity_slots == ()
     assert ledger.model_calls == 1
 
 
-def test_semantic_slot_filler_rejects_protected_key():
+def test_semantic_slot_filler_rejects_non_slot_key():
     class _BadGateway(_Gateway):
         def call(
             self,
@@ -177,7 +182,7 @@ def test_semantic_slot_filler_rejects_protected_key():
             )
 
     filler = SemanticSlotFiller(_BadGateway())
-    with pytest.raises(ValueError, match="protected"):
+    with pytest.raises(ValueError, match="semantic slot fill"):
         GoalInterpreter().interpret("이 작업을 처리해줘", semantic_fill=filler)
 
 
@@ -234,7 +239,11 @@ async def test_stale_prepared_action_never_reaches_injector():
         Action(id="click", op=ActionOp.CLICK),
         element.id,
         element=element,
-        physical_point=ScreenPoint(CoordinateSpace.SCREEN_PHYSICAL_PX, 10, 10),
+        physical_point=ScreenPoint(
+            CoordinateSpace.SCREEN_PHYSICAL_PX,
+            10,
+            10,
+        ),
         source_scene=before,
     )
     result = await executor.execute(prepared, current_scene=after)
@@ -245,7 +254,11 @@ async def test_stale_prepared_action_never_reaches_injector():
 
 def test_task_budget_is_global_across_call_purposes():
     ledger = TaskBudgetLedger(
-        TaskBudgetSpec(max_model_calls=2, max_model_tokens=20, max_model_latency_ms=100)
+        TaskBudgetSpec(
+            max_model_calls=2,
+            max_model_tokens=20,
+            max_model_latency_ms=100,
+        )
     )
     inner = _Gateway()
     gateway = BudgetedGateway(inner, ledger)
@@ -271,6 +284,16 @@ def test_frame_store_is_bounded_and_evicts_oldest():
     assert len(store) == 2
 
 
+def _grounding(element_id: str) -> GroundingResult:
+    return GroundingResult(
+        element_id=element_id,
+        confidence=1.0,
+        candidates=(
+            GroundingCandidate(element_id=element_id, confidence=1.0),
+        ),
+    )
+
+
 @pytest.mark.asyncio
 async def test_task_runtime_preserves_preused_global_budget_ledger():
     goal = GoalInterpreter().interpret(
@@ -280,7 +303,9 @@ async def test_task_runtime_preserves_preused_global_budget_ledger():
     )
     strategy = StrategyPlanner().select(goal, _screen_capability())
     budget = TaskBudgetSpec(
-        max_model_calls=2, max_model_tokens=100, max_model_latency_ms=1000
+        max_model_calls=2,
+        max_model_tokens=100,
+        max_model_latency_ms=1000,
     )
     plan = PlanCompiler().compile_search(
         goal,
@@ -292,15 +317,74 @@ async def test_task_runtime_preserves_preused_global_budget_ledger():
     ledger = TaskBudgetLedger(budget)
     ledger.before_call(ModelCallPurpose.INTENT_FILL)
     ledger.record(
-        GatewayResponse(content="{}", model="fake", tokens_used=3, latency_ms=5)
+        GatewayResponse(
+            content="{}",
+            model="fake",
+            tokens_used=3,
+            latency_ms=5,
+        )
     )
 
     class _Loop:
+        def __init__(self) -> None:
+            self.version = 0
+
         async def step(self, query, action, *, verification_query=None):
-            return StepResult(success=True, scene=Scene(version=1))
+            del query, verification_query
+            self.version += 1
+            if action.id in ("focus-search", "type-query", "submit-query"):
+                text = "노트북" if action.id != "focus-search" else ""
+                primary_id = "search-field"
+                primary = UIElement(
+                    id=primary_id,
+                    scene_version=self.version,
+                    role="textbox",
+                    name="Search",
+                    text=text,
+                    state=ElementState(visible=True, enabled=True),
+                    fingerprint="search-field",
+                )
+                elements = {primary_id: primary}
+                verification = None
+                if action.id == "submit-query":
+                    result = UIElement(
+                        id="result-card",
+                        scene_version=self.version,
+                        role="link",
+                        name="노트북 result",
+                        text="노트북 result",
+                        state=ElementState(visible=True, enabled=True),
+                        fingerprint="result-card",
+                    )
+                    elements[result.id] = result
+                    verification = _grounding(result.id)
+                return StepResult(
+                    success=True,
+                    scene=Scene(version=self.version, elements=elements),
+                    grounding=_grounding(primary_id),
+                    verification_grounding=verification,
+                )
+            result = UIElement(
+                id="result-card",
+                scene_version=self.version,
+                role="link",
+                name="노트북 result",
+                text="노트북 result",
+                state=ElementState(visible=True, enabled=True),
+                fingerprint="result-card",
+            )
+            return StepResult(
+                success=True,
+                scene=Scene(
+                    version=self.version,
+                    elements={result.id: result},
+                ),
+                grounding=_grounding(result.id),
+            )
 
     runtime = TaskRuntime(_Loop(), budget_ledger=ledger)
     result = await runtime.run(plan)
     assert result.success is True
+    assert result.terminal_evidence_ids == ("search-field", "result-card")
     assert runtime.budget_ledger is ledger
     assert runtime.budget_ledger.model_calls == 1

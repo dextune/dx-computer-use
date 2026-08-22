@@ -1,4 +1,4 @@
-"""Run shopping cases: python -m hpcu.cases --out DIR."""
+"""Run data-defined cases through the single command runtime."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from hpcu.cases.planning import CasePlanCompiler, CasePlanningContextProvider
 from hpcu.cases.runner import CaseRunner
 from hpcu.cases.specs import load_cases
 from hpcu.cases.stats import CountingGateway, dumps_stats
@@ -20,7 +21,14 @@ from hpcu.gateway.registry import create_gateway
 from hpcu.grounder.grounder import Grounder
 from hpcu.observation.facade import CompositeObserver
 from hpcu.platform.linux.sandbox import create_sandbox_backends, probe
+from hpcu.recovery.loop_breaker import LoopBreaker
 from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
+from hpcu.runtime_core.control_loop import ControlLoop
+from hpcu.runtime_core.product_runtime import CommandRuntime
+from hpcu.schemas.capability import Capability
+from hpcu.schemas.strategy import CapabilitySnapshot
+from hpcu.schemas.surface import ExecutionMode, SurfaceKind
+from hpcu.verifier.verifier import Verifier
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -133,13 +141,7 @@ def _write_run_manifest(
 
 
 def _build_gateway(runtime_config: dict) -> CountingGateway:
-    """Build one logical-call counter outside transparent transport retries.
-
-    The old wrapper order counted every transient HTTP retry as a new semantic
-    model call. That made call budgets and run statistics lie. Counting now
-    occurs once per compiler/decision request, while ``RetryableGateway`` may
-    transparently retry the same request below that accounting boundary.
-    """
+    """Compose one logical-call counter outside transport retries."""
     semantic_limits = runtime_config.get("semantic", {}).get(
         "request_limits", {}
     )
@@ -155,13 +157,41 @@ def _build_gateway(runtime_config: dict) -> CountingGateway:
     return CountingGateway(transport)
 
 
+def _capability_snapshot(capture, structure, injector) -> CapabilitySnapshot:
+    capture_caps = capture.capabilities()
+    structure_caps = structure.capabilities()
+    input_caps = injector.capabilities()
+    physical = (
+        Capability.SUPPORTED
+        if input_caps.physical_pointer is Capability.SUPPORTED
+        and input_caps.physical_keyboard is Capability.SUPPORTED
+        else Capability.DEGRADED
+        if input_caps.physical_pointer is not Capability.UNSUPPORTED
+        or input_caps.physical_keyboard is not Capability.UNSUPPORTED
+        else Capability.UNSUPPORTED
+    )
+    return CapabilitySnapshot(
+        active_surface=SurfaceKind.BROWSER,
+        execution_mode=ExecutionMode.SCREEN_STRICT,
+        capture=capture_caps.pixel_grab,
+        structure=structure_caps.tree,
+        semantic_input=input_caps.semantic_invoke,
+        physical_input=physical,
+        ocr=Capability.SUPPORTED,
+        dirty_rects=capture_caps.dirty_rects,
+    )
+
+
 async def _run(args: argparse.Namespace) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     specs = load_cases(args.cases)
     if args.limit > 0:
         specs = specs[: args.limit]
     cases_path = args.out / "cases.txt"
-    cases_path.write_text("\n".join(spec.id for spec in specs) + "\n", encoding="utf-8")
+    cases_path.write_text(
+        "\n".join(spec.id for spec in specs) + "\n",
+        encoding="utf-8",
+    )
     runtime_config = load_runtime_config()
     _write_run_manifest(
         args.out,
@@ -178,12 +208,34 @@ async def _run(args: argparse.Namespace) -> int:
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
+
     capture, structure, injector = create_sandbox_backends(
-        "shopping", base_url=args.base_url
+        "shopping",
+        base_url=args.base_url,
     )
     observer = CompositeObserver("shopping", capture, structure)
-    executor = Executor(injector)
-    runner = CaseRunner(observer, executor, Grounder(), gateway, config=runtime_config)
+    control_loop = ControlLoop(
+        observer=observer,
+        grounder=Grounder(config=runtime_config),
+        executor=Executor(injector, config=runtime_config),
+        verifier=Verifier(),
+        loop_breaker=LoopBreaker(),
+        config=runtime_config,
+    )
+    runtime = CommandRuntime(
+        lambda: control_loop,
+        provider_gateway=gateway,
+        planning_context_provider=CasePlanningContextProvider(
+            config=runtime_config
+        ),
+        plan_compiler=CasePlanCompiler(),
+        config=runtime_config,
+    )
+    runner = CaseRunner(
+        runtime,
+        _capability_snapshot(capture, structure, injector),
+    )
+
     rows = []
     for spec in specs:
         print(f"CASE_START {spec.id}", flush=True)

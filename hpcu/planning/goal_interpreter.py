@@ -91,7 +91,10 @@ class GoalInterpreter:
             (IntentKind.SUBMIT, ("제출", "전송", "보내", "submit", "send")),
             (IntentKind.SEARCH, ("검색", "찾아", "find", "search")),
             (IntentKind.SELECT, ("선택", "골라", "choose", "select")),
-            (IntentKind.NAVIGATE, ("열어", "접속", "이동", "open", "go to", "navigate")),
+            (
+                IntentKind.NAVIGATE,
+                ("열어", "접속", "이동", "open", "go to", "navigate"),
+            ),
         )
         for intent, words in ordered:
             if _contains(text, words):
@@ -106,7 +109,15 @@ class GoalInterpreter:
             return SurfaceKind.TERMINAL
         if _contains(
             text,
-            ("브라우저", "사이트", "웹", "browser", "website", "http://", "https://"),
+            (
+                "브라우저",
+                "사이트",
+                "웹",
+                "browser",
+                "website",
+                "http://",
+                "https://",
+            ),
         ):
             return SurfaceKind.BROWSER
         if _contains(text, ("데스크톱", "앱", "desktop", "application")):
@@ -116,11 +127,29 @@ class GoalInterpreter:
     @staticmethod
     def _risk(text: str) -> tuple[GoalRisk, Reversibility]:
         if _contains(
-            text, ("결제", "구매", "송금", "pay", "purchase", "checkout", "transfer")
+            text,
+            (
+                "결제",
+                "구매",
+                "송금",
+                "pay",
+                "purchase",
+                "checkout",
+                "transfer",
+            ),
         ):
             return GoalRisk.CRITICAL, Reversibility.IRREVERSIBLE
         if _contains(
-            text, ("삭제", "탈퇴", "제출", "delete", "remove", "deactivate", "submit")
+            text,
+            (
+                "삭제",
+                "탈퇴",
+                "제출",
+                "delete",
+                "remove",
+                "deactivate",
+                "submit",
+            ),
         ):
             return GoalRisk.HIGH, Reversibility.IRREVERSIBLE
         if _contains(text, ("수정", "변경", "edit", "rename", "toggle", "select")):
@@ -151,9 +180,21 @@ class GoalInterpreter:
     @staticmethod
     def _constraints(text: str) -> tuple[GoalConstraint, ...]:
         result: list[GoalConstraint] = []
-        if _contains(text, ("하지 마", "하지마", "금지", "don't", "do not", "without")):
+        if _contains(
+            text,
+            ("하지 마", "하지마", "금지", "don't", "do not", "without"),
+        ):
             result.append(GoalConstraint("negative_instruction", text, negated=True))
-        for token in ("이하", "이상", "미만", "초과", "under", "over", "at least", "at most"):
+        for token in (
+            "이하",
+            "이상",
+            "미만",
+            "초과",
+            "under",
+            "over",
+            "at least",
+            "at most",
+        ):
             if token.casefold() in text.casefold():
                 result.append(GoalConstraint("bound", token))
         return tuple(result)
@@ -185,9 +226,11 @@ class GoalInterpreter:
                 "the requested item is selected and independently observable"
             ),
             IntentKind.COMPARE: (
-                "comparison evidence for the requested entities is available"
+                "comparison evidence for two distinct candidates is available"
             ),
-            IntentKind.EDIT: "the requested value is changed and observable",
+            IntentKind.EDIT: (
+                "old and requested new values are independently observable"
+            ),
             IntentKind.SUBMIT: "submission result is independently observable",
             IntentKind.UNKNOWN: (
                 "requested user-visible state is independently observable"
@@ -200,8 +243,8 @@ class GoalInterpreter:
             IntentKind.NAVIGATE: ("surface_identity",),
             IntentKind.SEARCH: ("query_echo", "result_candidate"),
             IntentKind.SELECT: ("selected_state",),
-            IntentKind.COMPARE: ("multiple_candidates",),
-            IntentKind.EDIT: ("value_changed",),
+            IntentKind.COMPARE: ("candidate_a", "candidate_b"),
+            IntentKind.EDIT: ("old_value", "edited_value"),
             IntentKind.SUBMIT: ("submission_confirmation",),
             IntentKind.UNKNOWN: ("independent_terminal_evidence",),
         }[intent]
@@ -231,8 +274,6 @@ class GoalInterpreter:
                 raise ValueError("semantic search_query must be non-empty")
             entities.append(GoalEntity("search_query", query))
             remaining.remove("search_query")
-        # Risk, reversibility and forbidden actions are intentionally copied
-        # unchanged: semantic assistance cannot relax local safety facts.
         return replace(
             envelope,
             intent=intent,

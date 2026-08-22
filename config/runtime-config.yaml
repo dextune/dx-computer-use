@@ -6,6 +6,7 @@ semantic:
   default_model: MiniMax-M3
   request_limits:
     plan_compile_max_tokens: 1024
+    intent_fill_max_tokens: 256
     action_decision_max_tokens: 512
     reanalysis_max_tokens: 512
     plan_compile_retry_attempts: 2
@@ -14,7 +15,9 @@ semantic:
     retry_base_delay_ms: 500
     retry_max_delay_ms: 8000
   routes:
+    intent_fill: minimax
     plan_compile: minimax
+    grounding: minimax
     situation_analysis: minimax
     action_decision: minimax
     post_action_reanalysis: minimax
@@ -35,6 +38,10 @@ performance:
 tier_budget:
   max_model_calls_per_task: 8
   max_vlm_calls_per_task: 3
+
+recovery:
+  max_local_repairs_per_node: 1
+  max_replans_per_task: 2
 
 policy:
   high_risk_require_approval: true

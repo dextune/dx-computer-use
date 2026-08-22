@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from hpcu.input.injector import ExecutionResult, InputInjector
+from hpcu.input.keys import ENTER, FOCUS_LOCATION
 from hpcu.runtime_config import load_runtime_config
 from hpcu.schemas.action import Action, ActionOp
 from hpcu.schemas.coordinates import BoundingBox, ScreenPoint
@@ -36,7 +37,7 @@ _COMMAND_TO_OP = {
 
 _OP_COMMAND = {
     ActionOp.INVOKE: "invoke",
-    ActionOp.NAVIGATE: "invoke",
+    ActionOp.NAVIGATE: "navigate",
     ActionOp.CLICK: "click",
     ActionOp.DOUBLE_CLICK: "double_click",
     ActionOp.RIGHT_CLICK: "right_click",
@@ -143,6 +144,9 @@ class Executor:
         if stale is not None:
             return stale
 
+        if prepared.action.op is ActionOp.NAVIGATE:
+            return await self._navigate(prepared)
+
         if prepared.element is not None:
             semantic_result = await self._injector.semantic(
                 prepared.element, prepared.command
@@ -163,6 +167,30 @@ class Executor:
             mode="none",
             failure_code=FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value,
         )
+
+    async def _navigate(self, prepared: PreparedAction) -> ExecutionResult:
+        """Navigate through portable keys while remaining one logical action."""
+        url = (prepared.action.value or "").strip()
+        point = prepared.physical_point
+        if not url or point is None:
+            return ExecutionResult(
+                success=False,
+                mode="none",
+                failure_code=FailureCode.ACTION_UNSUPPORTED.value,
+            )
+        if prepared.element is not None:
+            await self._injector.semantic(prepared.element, "focus")
+        sequence = (
+            ("key", FOCUS_LOCATION),
+            ("replace_text", url),
+            ("key", ENTER),
+        )
+        last = ExecutionResult(success=True, mode="physical")
+        for command, text in sequence:
+            last = await self._injector.physical(point, command, text=text)
+            if not last.success:
+                return last
+        return last
 
     def _freshness_failure(
         self,
@@ -212,7 +240,7 @@ class Executor:
         command: str,
         text: str | None = None,
     ) -> ExecutionResult:
-        """Run a known physical command; unknown commands never become clicks."""
+        """Compatibility adapter for a known physical command only."""
         if not is_valid_command(command) or command not in _COMMAND_TO_OP:
             return ExecutionResult(
                 success=False,
