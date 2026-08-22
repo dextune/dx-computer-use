@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from hpcu.gateway.gateway import Gateway, RetryableGateway
 from hpcu.planning.goal_interpreter import GoalInterpreter
@@ -28,15 +29,20 @@ class UnresolvedGoalError(ValueError):
 class CommandRequest:
     instruction: str
     capability: CapabilitySnapshot
-    planning_context: PlanningContext
+    planning_context: PlanningContext | None = None
     task_budget: TaskBudgetSpec = TaskBudgetSpec()
     max_steps: int | None = None
+    context_metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.instruction.strip():
             raise ValueError("command instruction must be non-empty")
         if self.max_steps is not None and self.max_steps <= 0:
             raise ValueError("max_steps must be positive")
+        metadata = dict(self.context_metadata)
+        if any(not key.strip() for key in metadata):
+            raise ValueError("context metadata keys must be non-empty")
+        object.__setattr__(self, "context_metadata", MappingProxyType(metadata))
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,9 @@ class CommandRunResult:
     model_calls: int
     model_tokens: int
     model_latency_ms: int
+    model_calls_by_purpose: tuple[tuple[str, int], ...] = ()
+    provider_id: str = ""
+    model_id: str = ""
 
     @property
     def success(self) -> bool:
@@ -55,6 +64,16 @@ class CommandRunResult:
 
 
 RepairerFactory = Callable[[Gateway, TaskBudgetLedger], Repairer]
+PlanningContextProvider = Callable[
+    [
+        GoalEnvelope,
+        StrategyPlan,
+        CommandRequest,
+        Gateway | None,
+        TaskBudgetLedger,
+    ],
+    PlanningContext,
+]
 
 
 class CommandRuntime:
@@ -65,6 +84,7 @@ class CommandRuntime:
         control_loop_factory: Callable[[], ControlLoop],
         *,
         provider_gateway: Gateway | None = None,
+        planning_context_provider: PlanningContextProvider | None = None,
         goal_interpreter: GoalInterpreter | None = None,
         strategy_planner: StrategyPlanner | None = None,
         plan_compiler: PlanCompiler | None = None,
@@ -74,6 +94,7 @@ class CommandRuntime:
     ) -> None:
         self._control_loop_factory = control_loop_factory
         self._provider_gateway = provider_gateway
+        self._planning_context_provider = planning_context_provider
         self._goal_interpreter = goal_interpreter or GoalInterpreter()
         self._strategy_planner = strategy_planner or StrategyPlanner()
         self._plan_compiler = plan_compiler or PlanCompiler()
@@ -99,10 +120,21 @@ class CommandRuntime:
             )
 
         strategy = self._strategy_planner.select(goal, request.capability)
+        context = request.planning_context
+        if context is None:
+            if self._planning_context_provider is None:
+                raise ValueError("planning context or context provider is required")
+            context = self._planning_context_provider(
+                goal,
+                strategy,
+                request,
+                gateway,
+                ledger,
+            )
         plan = self._plan_compiler.compile(
             goal,
             strategy,
-            request.planning_context,
+            context,
             request.task_budget,
         )
         semantic_replanner = (
@@ -118,6 +150,12 @@ class CommandRuntime:
             config=self._config,
         )
         task = await runtime.run(plan, max_steps=request.max_steps)
+        calls_by_purpose = tuple(
+            sorted(
+                (purpose.value, count)
+                for purpose, count in ledger.calls_by_purpose.items()
+            )
+        )
         return CommandRunResult(
             goal=goal,
             strategy=strategy,
@@ -126,6 +164,9 @@ class CommandRuntime:
             model_calls=ledger.model_calls,
             model_tokens=ledger.tokens_used,
             model_latency_ms=ledger.latency_ms,
+            model_calls_by_purpose=calls_by_purpose,
+            provider_id=gateway.provider_id if gateway is not None else "",
+            model_id=gateway.model_id if gateway is not None else "",
         )
 
     def _semantic_gateway(
