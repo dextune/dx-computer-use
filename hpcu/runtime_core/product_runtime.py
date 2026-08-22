@@ -76,6 +76,18 @@ PlanningContextProvider = Callable[
 ]
 
 
+def _contains_retry_boundary(gateway: Gateway) -> bool:
+    """Detect an existing retry wrapper through transparent gateway layers."""
+    current: object | None = gateway
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, RetryableGateway):
+            return True
+        current = getattr(current, "_inner", None)
+    return False
+
+
 class CommandRuntime:
     """Build one ledger, one semantic boundary, and one TaskRuntime per task."""
 
@@ -142,8 +154,12 @@ class CommandRuntime:
             if gateway is not None and self._semantic_replanner_factory is not None
             else None
         )
+        control_loop = self._control_loop_factory()
+        begin_task = getattr(control_loop, "begin_task", None)
+        if callable(begin_task):
+            begin_task()
         runtime = TaskRuntime(
-            self._control_loop_factory(),
+            control_loop,
             ledger,
             local_repairer=self._local_repairer,
             semantic_replanner=semantic_replanner,
@@ -176,14 +192,12 @@ class CommandRuntime:
         if self._provider_gateway is None:
             return None
         limits = self._config.get("semantic", {}).get("request_limits", {})
-        transport = (
-            self._provider_gateway
-            if isinstance(self._provider_gateway, RetryableGateway)
-            else RetryableGateway(
-                self._provider_gateway,
+        transport = self._provider_gateway
+        if not _contains_retry_boundary(transport):
+            transport = RetryableGateway(
+                transport,
                 max_retries=int(limits.get("action_decision_retry_attempts", 2)),
                 base_delay_ms=int(limits.get("retry_base_delay_ms", 500)),
                 max_delay_ms=int(limits.get("retry_max_delay_ms", 8000)),
             )
-        )
         return BudgetedGateway(transport, ledger)
