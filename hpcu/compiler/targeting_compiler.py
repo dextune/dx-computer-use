@@ -2,7 +2,8 @@
 
 T1 is a model-free goal tokenizer. T2 performs one logical plan call and uses
 the shared gateway framing API. Provider transport retries remain below this
-compiler and lexical fallback is explicit in ``TargetingPack.source``.
+compiler. Lexical fallback is used only when no semantic gateway is configured;
+a configured gateway failure or invalid response fails closed.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Optional
 from hpcu.gateway.gateway import Gateway, ModelCallPurpose
 from hpcu.gateway.json_response import select_json_object
 from hpcu.runtime_config import load_runtime_config
+from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.targeting import TargetingPack
 
 _PUNCTUATION_SPLIT = re.compile(
@@ -45,6 +47,15 @@ def _tokenize_goal(goal: str, min_length: int) -> list[str]:
     return tokens
 
 
+class TargetingCompilationError(RuntimeError):
+    """A configured semantic compilation failed before an executable plan."""
+
+    def __init__(self, diagnostic: str, failure_code: FailureCode) -> None:
+        super().__init__(diagnostic)
+        self.diagnostic = diagnostic
+        self.failure_code = failure_code.value
+
+
 class GoalFallbackTokenizer:
     """Convert a goal string to a pack without site or CTA dictionaries."""
 
@@ -74,7 +85,7 @@ class GoalFallbackTokenizer:
 
 
 class TargetingCompiler:
-    """Compile a user goal using one logical model call, then fail closed."""
+    """Compile a user goal with one logical model call and fail closed."""
 
     def __init__(
         self,
@@ -106,8 +117,10 @@ class TargetingCompiler:
                 purpose=ModelCallPurpose.PLAN_COMPILE,
             )
         except Exception as error:
-            self.last_diagnostic = f"gateway_error:{type(error).__name__}"
-            return self._fallback.tokenize(goal_id, goal)
+            diagnostic = f"gateway_error:{type(error).__name__}"
+            self.last_diagnostic = diagnostic
+            failure_code = self._gateway_failure_code(error)
+            raise TargetingCompilationError(diagnostic, failure_code) from error
 
         try:
             payload = select_json_object(
@@ -116,15 +129,31 @@ class TargetingCompiler:
                 allowed_keys=_TARGETING_KEYS,
                 schema_name="targeting plan",
             )
-        except ValueError:
-            self.last_diagnostic = "schema_error:no_unique_targeting_object"
-            return self._fallback.tokenize(goal_id, goal)
+        except ValueError as error:
+            diagnostic = "schema_error:no_unique_targeting_object"
+            self.last_diagnostic = diagnostic
+            raise TargetingCompilationError(
+                diagnostic,
+                FailureCode.MODEL_SCHEMA_INVALID,
+            ) from error
 
         try:
             return _pack_from_json(goal_id, payload)
         except ValueError as error:
-            self.last_diagnostic = f"schema_error:{error}"
-            return self._fallback.tokenize(goal_id, goal)
+            diagnostic = f"schema_error:{error}"
+            self.last_diagnostic = diagnostic
+            raise TargetingCompilationError(
+                diagnostic,
+                FailureCode.MODEL_SCHEMA_INVALID,
+            ) from error
+
+    @staticmethod
+    def _gateway_failure_code(error: Exception) -> FailureCode:
+        raw = getattr(error, "failure_code", FailureCode.MODEL_FAILED.value)
+        try:
+            return FailureCode(raw)
+        except (TypeError, ValueError):
+            return FailureCode.MODEL_FAILED
 
 
 def _build_compile_prompt(goal: str, start_url: str) -> str:

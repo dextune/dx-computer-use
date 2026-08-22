@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from hpcu.executor.executor import Executor
-from hpcu.grounder.grounder import Grounder
+from hpcu.grounder.grounder import Grounder, GroundingCandidate, GroundingResult
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.observation.base import Observer
 from hpcu.policy.risk_engine import RiskEngine
@@ -63,6 +63,33 @@ class FakeObserver(Observer):
         return SceneDelta(base_version=1, new_version=2, modified=refreshed)
 
 
+class ScriptedGrounder:
+    def __init__(self, *results: GroundingResult):
+        self._results = list(results)
+
+    def resolve(self, query, scene) -> GroundingResult:
+        del query, scene
+        return self._results.pop(0)
+
+
+def _grounding(
+    element_id: str | None,
+    confidence: float,
+    *,
+    failure_code: FailureCode | None = None,
+    candidate_ids: tuple[str, ...] = (),
+) -> GroundingResult:
+    return GroundingResult(
+        element_id=element_id,
+        confidence=confidence,
+        candidates=tuple(
+            GroundingCandidate(candidate_id, confidence)
+            for candidate_id in candidate_ids
+        ),
+        failure_code=failure_code,
+    )
+
+
 def _login_button(*, selected: bool = False) -> UIElement:
     return UIElement(
         id="login",
@@ -91,12 +118,13 @@ def _loop(
     before: tuple[UIElement, ...],
     after: tuple[UIElement, ...] | None = None,
     injector: FakeInjector | None = None,
+    grounder=None,
 ):
     inj = injector or FakeInjector()
     recorder = TraceRecorder()
     loop = ControlLoop(
         observer=FakeObserver(before, after),
-        grounder=Grounder(confidence_threshold=0.5, min_margin=0.0),
+        grounder=grounder or Grounder(confidence_threshold=0.5, min_margin=0.0),
         executor=Executor(inj),
         verifier=Verifier(),
         risk_engine=RiskEngine(),
@@ -166,5 +194,76 @@ async def test_step_unresolved_does_not_call_model():
     result = await loop.step({"text": "없는버튼"}, action)
     assert result.success is False
     assert result.skipped is True
+    assert result.failure_code == FailureCode.GROUNDING_NO_CANDIDATES.value
     assert injector.semantic_calls == []
+    assert recorder.model_call_count == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "failure_code",
+    [
+        FailureCode.GROUNDING_CONFIDENCE_LOW,
+        FailureCode.GROUNDING_AMBIGUOUS,
+    ],
+)
+async def test_step_preserves_cpu_grounding_failure_reason(failure_code):
+    unresolved = _grounding(
+        None,
+        0.7,
+        failure_code=failure_code,
+        candidate_ids=("login", "other"),
+    )
+    loop, injector, recorder = _loop(
+        (_login_button(),),
+        grounder=ScriptedGrounder(unresolved),
+    )
+
+    result = await loop.step({"text": "로그인"}, Action(id="s1", op=ActionOp.CLICK))
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.failure_code == failure_code.value
+    assert injector.semantic_calls == []
+    assert recorder.model_call_count == 0
+
+
+@pytest.mark.unit
+async def test_verification_grounding_preserves_cpu_failure_reason():
+    resolved = _grounding(
+        "login",
+        1.0,
+        candidate_ids=("login",),
+    )
+    unresolved = _grounding(
+        None,
+        0.6,
+        failure_code=FailureCode.GROUNDING_CONFIDENCE_LOW,
+        candidate_ids=("login",),
+    )
+    loop, injector, recorder = _loop(
+        (_login_button(),),
+        (_login_button(selected=True),),
+        grounder=ScriptedGrounder(resolved, unresolved),
+    )
+    action = Action(
+        id="s1",
+        op=ActionOp.CLICK,
+        postconditions=(
+            Postcondition(
+                kind=PostconditionKind.ELEMENT_VISIBLE,
+                target="$verify",
+            ),
+        ),
+    )
+
+    result = await loop.step(
+        {"text": "로그인"},
+        action,
+        verification_query={"text": "완료"},
+    )
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.GROUNDING_CONFIDENCE_LOW.value
+    assert injector.semantic_calls == ["login"]
     assert recorder.model_call_count == 0

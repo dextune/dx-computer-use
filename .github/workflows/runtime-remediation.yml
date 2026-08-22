@@ -3,7 +3,13 @@ name: runtime-remediation
 on:
   push:
     branches:
-      - codex/runtime-remediation-5x-20260823
+      - main
+      - "codex/**"
+    paths:
+      - "hpcu/**"
+      - "tests/**"
+      - "config/**"
+      - ".github/workflows/runtime-remediation.yml"
   pull_request:
     paths:
       - "hpcu/**"
@@ -38,6 +44,7 @@ jobs:
         run: >-
           python -m ruff check
           hpcu/compiler/targeting_compiler.py
+          hpcu/grounder/grounder.py
           hpcu/planning
           hpcu/router/router.py
           hpcu/runtime_core
@@ -49,6 +56,8 @@ jobs:
           tests/unit/test_temporal_runtime.py
           tests/unit/test_runtime_remediation.py
           tests/unit/test_cases.py
+          tests/unit/test_control_loop.py
+          tests/unit/test_grounder.py
           tests/unit/test_router.py
           tests/unit/test_targeting.py
           tests/unit/test_targeting_compiler_reliability.py
@@ -74,6 +83,7 @@ jobs:
           tests/unit/test_runtime_remediation.py
           tests/unit/test_control_loop.py
           tests/unit/test_executor.py
+          tests/unit/test_grounder.py
           tests/unit/test_router.py
           tests/unit/test_cases.py
           tests/unit/test_targeting.py

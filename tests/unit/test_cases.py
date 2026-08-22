@@ -9,6 +9,7 @@ import pytest
 from hpcu.cases.runner import CaseRunner
 from hpcu.cases.specs import CaseSpec, load_cases
 from hpcu.cases.stats import CaseStats, aggregate
+from hpcu.compiler.targeting_compiler import TargetingCompilationError
 from hpcu.runtime_core.product_runtime import UnresolvedGoalError
 from hpcu.runtime_core.task_runtime import TaskRunResult, TaskStatus
 from hpcu.schemas.action import Action, ActionOp
@@ -46,7 +47,11 @@ class _Runtime:
 
 
 def _command_result(*, status: TaskStatus = TaskStatus.VERIFIED_SUCCESS):
-    failure = None if status is TaskStatus.VERIFIED_SUCCESS else FailureCode.UNKNOWN.value
+    failure = (
+        None
+        if status is TaskStatus.VERIFIED_SUCCESS
+        else FailureCode.UNKNOWN.value
+    )
     task = TaskRunResult(
         status=status,
         node_id="verify",
@@ -169,6 +174,31 @@ async def test_case_runner_fails_closed_before_runtime_terminal_on_unresolved_go
     assert stats.success is False
     assert stats.failure_code == FailureCode.DECISION_REQUIRED.value
     assert stats.failure == "unresolved_goal"
+
+
+@pytest.mark.asyncio
+async def test_case_runner_maps_targeting_failure_without_executing_actions():
+    runtime = _Runtime(
+        error=TargetingCompilationError(
+            "schema_error:no_unique_targeting_object",
+            FailureCode.MODEL_SCHEMA_INVALID,
+        )
+    )
+    stats = await CaseRunner(runtime, _capability()).run_case(
+        CaseSpec(
+            id="bad-plan",
+            goal="노트북을 검색해줘",
+            start_url="https://example.com",
+        )
+    )
+
+    assert len(runtime.requests) == 1
+    assert stats.success is False
+    assert stats.runner_success is False
+    assert stats.verified_success is False
+    assert stats.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
+    assert stats.failure == "schema_error:no_unique_targeting_object"
+    assert stats.action_count == 0
 
 
 def test_aggregate_uses_verified_case_success_only():
