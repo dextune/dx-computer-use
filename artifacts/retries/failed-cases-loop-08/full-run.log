@@ -1,0 +1,754 @@
+CASE_START google-search-notebook-retry
+CASE_END google-search-notebook-retry success=True actions=11 model_calls=1 model_errors=0 failure=
+CASE_START bbc-news-retry
+CASE_END bbc-news-retry success=True actions=11 model_calls=1 model_errors=0 failure=
+CASE_START duckduckgo-linux-retry
+CASE_END duckduckgo-linux-retry success=False actions=30 model_calls=6 model_errors=0 failure=decision_required
+CASE_START github-explore-retry
+CASE_END github-explore-retry success=True actions=11 model_calls=2 model_errors=0 failure=
+CASE_START wikipedia-python-retry
+CASE_END wikipedia-python-retry success=True actions=11 model_calls=1 model_errors=0 failure=
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "cases": [
+    {
+      "case_id": "google-search-notebook-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 934,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=1",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=2",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 1,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 848,
+          "provider": "minimax",
+          "response_tokens": 934,
+          "latency_ms": 14226,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 17756,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-08/google-search-notebook-retry.json"
+      ]
+    },
+    {
+      "case_id": "bbc-news-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 690,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=3",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=4",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 2,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 690,
+          "latency_ms": 1666,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 4788,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-08/bbc-news-retry.json"
+      ]
+    },
+    {
+      "case_id": "duckduckgo-linux-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "verification_failed",
+      "failure_code": "decision_required",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 11,
+      "attempts": 5,
+      "max_attempts": 5,
+      "action_count": 30,
+      "model_call_count": 6,
+      "model_error_count": 0,
+      "model_tokens": 5988,
+      "compile_call_count": 1,
+      "grounding_call_count": 5,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "decision_required",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=5",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=6",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=7",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=8",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-3 v=9",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-4 v=10",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-5 v=11",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 3,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 824,
+          "provider": "minimax",
+          "response_tokens": 793,
+          "latency_ms": 6059,
+          "error": ""
+        },
+        {
+          "call_number": 4,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1593,
+          "provider": "minimax",
+          "response_tokens": 1087,
+          "latency_ms": 6308,
+          "error": ""
+        },
+        {
+          "call_number": 5,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1593,
+          "provider": "minimax",
+          "response_tokens": 1087,
+          "latency_ms": 7382,
+          "error": ""
+        },
+        {
+          "call_number": 6,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1593,
+          "provider": "minimax",
+          "response_tokens": 1087,
+          "latency_ms": 4868,
+          "error": ""
+        },
+        {
+          "call_number": 7,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1594,
+          "provider": "minimax",
+          "response_tokens": 847,
+          "latency_ms": 2038,
+          "error": ""
+        },
+        {
+          "call_number": 8,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1594,
+          "provider": "minimax",
+          "response_tokens": 1087,
+          "latency_ms": 8241,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 43040,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 7,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 3,
+          "model_call_end": 4,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 8,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 4,
+          "model_call_end": 5,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 3,
+          "scene_version_start": 9,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 5,
+          "model_call_end": 6,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 4,
+          "scene_version_start": 10,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 6,
+          "model_call_end": 7,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 5,
+          "scene_version_start": 11,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 7,
+          "model_call_end": 8,
+          "failure": "decision_required"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-08/duckduckgo-linux-retry.json"
+      ]
+    },
+    {
+      "case_id": "github-explore-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 2,
+      "model_error_count": 0,
+      "model_tokens": 1305,
+      "compile_call_count": 2,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=12",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=13",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 9,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 643,
+          "latency_ms": 5088,
+          "error": ""
+        },
+        {
+          "call_number": 10,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 662,
+          "latency_ms": 5017,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 13468,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-08/github-explore-retry.json"
+      ]
+    },
+    {
+      "case_id": "wikipedia-python-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 700,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=14",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=15",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 11,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 856,
+          "provider": "minimax",
+          "response_tokens": 700,
+          "latency_ms": 2293,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 6051,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-08/wikipedia-python-retry.json"
+      ]
+    }
+  ],
+  "totals": {
+    "cases": 5,
+    "successes": 4,
+    "action_count": 74,
+    "model_call_count": 11,
+    "model_error_count": 0,
+    "model_tokens": 9617,
+    "compile_call_count": 6,
+    "grounding_call_count": 5,
+    "purpose_call_counts": {
+      "plan_compile": 6,
+      "situation_analysis": 0,
+      "action_decision": 5,
+      "post_action_reanalysis": 0,
+      "recovery_reanalysis": 0
+    }
+  }
+}

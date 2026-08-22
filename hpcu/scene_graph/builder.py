@@ -28,6 +28,14 @@ class SceneBuilder:
         for element in delta.modified:
             existing = elements.get(element.id)
             elements[element.id] = self._merge_element(existing, element)
+        # A Scene is the freshness boundary. Capture adapters may reuse an
+        # element object from an earlier observation, but retaining its old
+        # version would make every otherwise-current target fail the stale
+        # decision check. Normalize retained elements to this Scene version.
+        elements = {
+            element_id: replace(element, scene_version=new_version)
+            for element_id, element in elements.items()
+        }
         frame = delta.frame if delta.frame is not None else scene.frame
         return Scene(
             version=new_version,

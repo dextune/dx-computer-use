@@ -1,8 +1,10 @@
 """Unit tests for benchmark harness."""
 
+import json
+
 import pytest
 
-from benchmarks.harness import BenchmarkHarness
+from benchmarks.harness import BenchmarkHarness, capture_dataset
 
 pytestmark = pytest.mark.unit
 
@@ -95,3 +97,32 @@ def test_harness_not_success_by_default():
     h.start()
     m = h.stop()
     assert m.success is False
+
+
+def test_capture_dataset_preserves_bounded_attempt_evidence(tmp_path):
+    output = tmp_path / "run-dataset.json"
+    capture_dataset(
+        [
+            {
+                "case_id": "bounded-failure",
+                "success": False,
+                "attempts": 5,
+                "max_attempts": 5,
+                "outcome": "verification_failed",
+                "evidence_status": "unsatisfied",
+                "attempts_detail": [{"attempt": number} for number in range(1, 6)],
+                "provider": "configured-provider",
+                "model": "configured-model",
+            }
+        ],
+        output,
+        provider="configured-provider",
+        model="configured-model",
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    case = payload["cases"][0]
+    assert case["attempts"] == 5
+    assert case["max_attempts"] == 5
+    assert [row["attempt"] for row in case["attempts_detail"]] == [1, 2, 3, 4, 5]
+    assert case["evidence_status"] == "unsatisfied"
+    assert payload["provider"] == "configured-provider"

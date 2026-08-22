@@ -1,0 +1,1146 @@
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "cases": [
+    {
+      "case_id": "google-search-notebook-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 769,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=1",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=2",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 1,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 848,
+          "provider": "minimax",
+          "response_tokens": 769,
+          "latency_ms": 5819,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 8857,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-10/google-search-notebook-retry.json"
+      ]
+    },
+    {
+      "case_id": "bbc-news-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "verification_failed",
+      "failure_code": "decision_required",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 9,
+      "attempts": 5,
+      "max_attempts": 5,
+      "action_count": 30,
+      "model_call_count": 6,
+      "model_error_count": 0,
+      "model_tokens": 4944,
+      "compile_call_count": 1,
+      "grounding_call_count": 5,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "decision_required",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=3",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=4",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=5",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=6",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-3 v=7",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-4 v=8",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-5 v=9",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 2,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 902,
+          "latency_ms": 5411,
+          "error": ""
+        },
+        {
+          "call_number": 3,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 741,
+          "provider": "minimax",
+          "response_tokens": 894,
+          "latency_ms": 2969,
+          "error": ""
+        },
+        {
+          "call_number": 4,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 994,
+          "provider": "minimax",
+          "response_tokens": 791,
+          "latency_ms": 5166,
+          "error": ""
+        },
+        {
+          "call_number": 5,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 994,
+          "provider": "minimax",
+          "response_tokens": 871,
+          "latency_ms": 2161,
+          "error": ""
+        },
+        {
+          "call_number": 6,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 807,
+          "provider": "minimax",
+          "response_tokens": 886,
+          "latency_ms": 2414,
+          "error": ""
+        },
+        {
+          "call_number": 7,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 752,
+          "provider": "minimax",
+          "response_tokens": 600,
+          "latency_ms": 4942,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 30332,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 5,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 2,
+          "model_call_end": 3,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 6,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 3,
+          "model_call_end": 4,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 3,
+          "scene_version_start": 7,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 4,
+          "model_call_end": 5,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 4,
+          "scene_version_start": 8,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 5,
+          "model_call_end": 6,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 5,
+          "scene_version_start": 9,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 6,
+          "model_call_end": 7,
+          "failure": "decision_required"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-10/bbc-news-retry.json"
+      ]
+    },
+    {
+      "case_id": "duckduckgo-linux-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "verification_failed",
+      "failure_code": "decision_required",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 16,
+      "attempts": 5,
+      "max_attempts": 5,
+      "action_count": 30,
+      "model_call_count": 6,
+      "model_error_count": 0,
+      "model_tokens": 5518,
+      "compile_call_count": 1,
+      "grounding_call_count": 5,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "decision_required",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=10",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=11",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=12",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=13",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-3 v=14",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-4 v=15",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-5 v=16",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 8,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 824,
+          "provider": "minimax",
+          "response_tokens": 688,
+          "latency_ms": 4939,
+          "error": ""
+        },
+        {
+          "call_number": 9,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 619,
+          "provider": "minimax",
+          "response_tokens": 854,
+          "latency_ms": 6431,
+          "error": ""
+        },
+        {
+          "call_number": 10,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1691,
+          "provider": "minimax",
+          "response_tokens": 867,
+          "latency_ms": 3001,
+          "error": ""
+        },
+        {
+          "call_number": 11,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1691,
+          "provider": "minimax",
+          "response_tokens": 1124,
+          "latency_ms": 3929,
+          "error": ""
+        },
+        {
+          "call_number": 12,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1691,
+          "provider": "minimax",
+          "response_tokens": 1004,
+          "latency_ms": 23899,
+          "error": ""
+        },
+        {
+          "call_number": 13,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1691,
+          "provider": "minimax",
+          "response_tokens": 981,
+          "latency_ms": 3071,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 52161,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 12,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 8,
+          "model_call_end": 9,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 13,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 9,
+          "model_call_end": 10,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 3,
+          "scene_version_start": 14,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 10,
+          "model_call_end": 11,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 4,
+          "scene_version_start": 15,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 11,
+          "model_call_end": 12,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 5,
+          "scene_version_start": 16,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 12,
+          "model_call_end": 13,
+          "failure": "decision_required"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-10/duckduckgo-linux-retry.json"
+      ]
+    },
+    {
+      "case_id": "github-explore-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 11,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 693,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=17",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=18",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 14,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 693,
+          "latency_ms": 5548,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 8919,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-10/github-explore-retry.json"
+      ]
+    },
+    {
+      "case_id": "wikipedia-python-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "verification_failed",
+      "failure_code": "decision_required",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 25,
+      "attempts": 5,
+      "max_attempts": 5,
+      "action_count": 30,
+      "model_call_count": 6,
+      "model_error_count": 0,
+      "model_tokens": 5663,
+      "compile_call_count": 1,
+      "grounding_call_count": 5,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "decision_required",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=19",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=20",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=21",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=22",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-3 v=23",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-4 v=24",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-5 v=25",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 15,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 856,
+          "provider": "minimax",
+          "response_tokens": 749,
+          "latency_ms": 5964,
+          "error": ""
+        },
+        {
+          "call_number": 16,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1845,
+          "provider": "minimax",
+          "response_tokens": 873,
+          "latency_ms": 4057,
+          "error": ""
+        },
+        {
+          "call_number": 17,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1845,
+          "provider": "minimax",
+          "response_tokens": 942,
+          "latency_ms": 7399,
+          "error": ""
+        },
+        {
+          "call_number": 18,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1845,
+          "provider": "minimax",
+          "response_tokens": 1002,
+          "latency_ms": 2064,
+          "error": ""
+        },
+        {
+          "call_number": 19,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1845,
+          "provider": "minimax",
+          "response_tokens": 1193,
+          "latency_ms": 6719,
+          "error": ""
+        },
+        {
+          "call_number": 20,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1845,
+          "provider": "minimax",
+          "response_tokens": 904,
+          "latency_ms": 2104,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 38278,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 21,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 15,
+          "model_call_end": 16,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 22,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 16,
+          "model_call_end": 17,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 3,
+          "scene_version_start": 23,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 17,
+          "model_call_end": 18,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 4,
+          "scene_version_start": 24,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 18,
+          "model_call_end": 19,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 5,
+          "scene_version_start": 25,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 19,
+          "model_call_end": 20,
+          "failure": "decision_required"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-10/wikipedia-python-retry.json"
+      ]
+    }
+  ],
+  "totals": {
+    "cases": 5,
+    "successes": 2,
+    "action_count": 112,
+    "model_call_count": 20,
+    "model_error_count": 0,
+    "model_tokens": 17587,
+    "compile_call_count": 5,
+    "grounding_call_count": 15,
+    "purpose_call_counts": {
+      "plan_compile": 5,
+      "situation_analysis": 0,
+      "action_decision": 15,
+      "post_action_reanalysis": 0,
+      "recovery_reanalysis": 0
+    }
+  }
+}

@@ -12,9 +12,14 @@ from hpcu.cases.runner import (
     evidence_holds,
 )
 from hpcu.cases.specs import EvidenceSpec, load_cases
-from hpcu.cases.stats import MINIMAX_MODEL, CountingGateway, aggregate
+from hpcu.cases.stats import (
+    DEFAULT_MODEL_ID,
+    DEFAULT_PROVIDER_ID,
+    CountingGateway,
+    aggregate,
+)
 from hpcu.executor.executor import Executor
-from hpcu.gateway.gateway import Gateway, GatewayResponse
+from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
 from hpcu.grounder.grounder import Grounder
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.observation.base import Observer
@@ -35,6 +40,7 @@ FAST_CONFIG = {
         "navigate_poll_interval_ms": 1,
         "post_click_timeout_ms": 5,
         "post_click_poll_interval_ms": 1,
+        "minimum_evidence_token_matches": 1,
     },
     "targeting": {
         "max_tokens_per_field": 8,
@@ -47,7 +53,7 @@ def _bbox(x: float, y: float, width: float, height: float) -> BoundingBox:
     return BoundingBox(space=SPACE, x=x, y=y, width=width, height=height)
 
 
-def _spec(**overrides) -> "CaseSpec":
+def _spec(**overrides) -> "CaseSpec":  # noqa: F821
     from hpcu.cases.specs import CaseSpec
 
     payload = dict(
@@ -56,7 +62,7 @@ def _spec(**overrides) -> "CaseSpec":
         start_url="https://example.com/water",
         evidence=EvidenceSpec(require_pick=True),
         max_attempts=2,
-        max_minimax_calls=2,
+        max_model_calls=2,
     )
     payload.update(overrides)
     return CaseSpec(**payload)
@@ -97,17 +103,87 @@ class RecordingInjector(InputInjector):
         return InputCapabilities(physical_pointer=Capability.SUPPORTED)
 
 
-class FakeGateway(Gateway):
-    def __init__(self, content: str = "", error: bool = False):
-        self.content = content
-        self.error = error
-        self.prompts: list[str] = []
+STRICT_ACTION_RESPONSE = (
+    '{"schema_version":1,"scene_version":1,"action":"click",'
+    '"target_id":"ocr_line_0","value":null,"key":null,'
+    '"goal_state":"in_progress","confidence":0.95,'
+    '"reason_code":"goal_progress",'
+    '"expected_postcondition":"new_screen"}'
+)
 
-    def call(self, prompt: str, system_prompt: str = "") -> GatewayResponse:
+
+class FakeGateway(Gateway):
+    def __init__(
+        self,
+        content: str = "",
+        error: bool = False,
+        model: str = DEFAULT_MODEL_ID,
+    ):
+        self.content = (
+            STRICT_ACTION_RESPONSE
+            if content == '{"target_id": "ocr_line_0"}'
+            else content
+        )
+        self.error = error
+        self.model = model
+        self.prompts: list[str] = []
+        self.purposes = []
+
+    @property
+    def provider_id(self) -> str:
+        return DEFAULT_PROVIDER_ID
+
+    @property
+    def model_id(self) -> str:
+        return self.model
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
         self.prompts.append(prompt)
+        self.purposes.append(purpose)
         if self.error:
             raise RuntimeError("gateway down")
-        return GatewayResponse(content=self.content, model="other-model", tokens_used=11)
+        if purpose is ModelCallPurpose.PLAN_COMPILE:
+            content = (
+                '{"ready_any":["ready"],"success_any":["생수"],'
+                '"forbid_any":[],"pick_query":"생수",'
+                '"pick_required":true,"dismiss_any":[],'
+                '"blocked_any":[],"ignore_any":[]}'
+            )
+        elif purpose is ModelCallPurpose.ACTION_DECISION:
+            content = self.content or STRICT_ACTION_RESPONSE
+        elif purpose in (
+            ModelCallPurpose.POST_ACTION_REANALYSIS,
+            ModelCallPurpose.RECOVERY_REANALYSIS,
+        ):
+            content = (
+                '{"schema_version":1,"scene_version":2,"goal_state":"success",'
+                '"challenge_kind":"none","confidence":0.9,'
+                '"reason_code":"fresh_scene"}'
+            )
+        else:
+            content = self.content
+        scene_version = 2
+        marker = 'Current scene_version: '
+        for line in self.prompts[-1].splitlines():
+            if line.startswith(marker):
+                scene_version = int(line.removeprefix(marker).split()[0])
+                break
+        content = content.replace(
+            '"scene_version":2', f'"scene_version":{scene_version}'
+        )
+        return GatewayResponse(
+            content=content,
+            model=self.model,
+            provider=DEFAULT_PROVIDER_ID,
+            tokens_used=11,
+        )
 
 
 def _window() -> UIElement:
@@ -142,7 +218,7 @@ def test_dumps_stats_is_json():
 
     raw = dumps_stats([CaseStats(case_id="a", success=True)])
     payload = __import__("json").loads(raw)
-    assert payload["model"] == MINIMAX_MODEL
+    assert payload["model"] == DEFAULT_MODEL_ID
     assert payload["totals"]["successes"] == 1
 
 
@@ -154,7 +230,10 @@ def test_main_parse_args_and_sandbox_down(tmp_path, monkeypatch, capsys):
     assert args.limit == 2
     monkeypatch.setattr(mainmod, "probe", lambda *_a, **_k: False)
     assert mainmod.main(["--out", str(tmp_path), "--limit", "1"]) == 2
-    assert (tmp_path / "cases.txt").read_text(encoding="utf-8").splitlines()[0] == "coupang-fresh-popular"
+    assert (
+        (tmp_path / "cases.txt").read_text(encoding="utf-8").splitlines()[0]
+        == "coupang-fresh-popular"
+    )
     assert "sandbox unreachable" in capsys.readouterr().err
 
 
@@ -168,15 +247,16 @@ def test_load_cases_has_ten_shopping_specs():
 
 
 @pytest.mark.unit
-def test_counting_gateway_forces_minimax_m3_and_counts_tokens():
+def test_counting_gateway_enforces_selected_identity_and_counts_tokens():
     inner = FakeGateway(content='{"target_id": "ocr_line_0"}')
     gateway = CountingGateway(inner)
     response = gateway.call("pick one")
-    assert response.model == MINIMAX_MODEL
+    assert response.model == DEFAULT_MODEL_ID
     assert gateway.call_count == 1
     assert gateway.error_count == 0
     assert gateway.tokens == 11
-    assert "MiniMax-M3" in gateway.http_log[0]
+    assert DEFAULT_PROVIDER_ID in gateway.http_log[0]
+    assert DEFAULT_MODEL_ID in gateway.http_log[0]
 
 
 @pytest.mark.unit
@@ -204,12 +284,12 @@ async def test_runner_local_path_makes_zero_model_calls():
     stats = await runner.run_case(_spec())
     assert stats.success is True
     # compile call happens at plan-time, grounding calls may be 0
-    assert stats.model == MINIMAX_MODEL
+    assert stats.model == DEFAULT_MODEL_ID
     assert any(kind == "click" for kind, _text in injector.physical_calls)
 
 
 @pytest.mark.unit
-async def test_runner_minimax_only_on_local_miss():
+async def test_runner_uses_semantic_provider_only_on_local_miss():
     chrome_price = UIElement(
         id="ocr_line_0",
         scene_version=1,
@@ -231,13 +311,13 @@ async def test_runner_minimax_only_on_local_miss():
     )
     stats = await runner.run_case(_spec())
     assert inner.prompts
-    assert stats.minimax_call_count >= 1
-    assert stats.model == MINIMAX_MODEL
+    assert stats.model_call_count >= 1
+    assert stats.model == DEFAULT_MODEL_ID
     assert "other-model" not in {action.detail for action in stats.actions}
 
 
 @pytest.mark.unit
-async def test_runner_minimax_error_increments_and_does_not_pick():
+async def test_runner_semantic_provider_error_increments_and_does_not_pick():
     injector = RecordingInjector()
     inner = FakeGateway(error=True)
     gateway = CountingGateway(inner)
@@ -249,11 +329,11 @@ async def test_runner_minimax_error_increments_and_does_not_pick():
         config=FAST_CONFIG,
         sleep=_instant,
     )
-    stats = await runner.run_case(_spec(max_attempts=1, max_minimax_calls=1))
+    stats = await runner.run_case(_spec(max_attempts=1, max_model_calls=1))
     assert stats.success is False
-    assert stats.minimax_error_count >= 1
-    assert stats.minimax_call_count >= 1
-    assert stats.model == MINIMAX_MODEL
+    assert stats.model_error_count >= 1
+    assert stats.model_call_count >= 1
+    assert stats.model == DEFAULT_MODEL_ID
 
 
 @pytest.mark.unit
@@ -314,27 +394,27 @@ def test_aggregate_totals_match_rows():
     from hpcu.cases.stats import CaseStats
 
     rows = [
-        CaseStats(case_id="a", success=True, action_count=3, minimax_call_count=0,
+        CaseStats(case_id="a", success=True, action_count=3, model_call_count=0,
                   compile_call_count=0, grounding_call_count=0),
         CaseStats(
             case_id="b",
             success=False,
             action_count=4,
-            minimax_call_count=2,
-            minimax_error_count=1,
-            minimax_tokens=9,
+            model_call_count=2,
+            model_error_count=1,
+            model_tokens=9,
             compile_call_count=1,
             grounding_call_count=1,
         ),
     ]
     payload = aggregate(rows)
-    assert payload["model"] == MINIMAX_MODEL
+    assert payload["model"] == DEFAULT_MODEL_ID
     assert payload["totals"]["cases"] == 2
     assert payload["totals"]["successes"] == 1
     assert payload["totals"]["action_count"] == 7
-    assert payload["totals"]["minimax_call_count"] == 2
-    assert payload["totals"]["minimax_error_count"] == 1
-    assert payload["totals"]["minimax_tokens"] == 9
+    assert payload["totals"]["model_call_count"] == 2
+    assert payload["totals"]["model_error_count"] == 1
+    assert payload["totals"]["model_tokens"] == 9
     assert payload["totals"]["compile_call_count"] == 1
     assert payload["totals"]["grounding_call_count"] == 1
 
@@ -363,7 +443,8 @@ async def test_dataset_capture_from_runner(dataset_collector):
     assert entry["case_id"] == "demo"
     assert entry["success"] is True
     assert isinstance(entry["actions"], list)
-    assert entry["minimax_call_count"] >= 0
+    assert entry["model_call_count"] >= 0
     assert entry["compile_call_count"] >= 0
     assert entry["grounding_call_count"] >= 0
-    assert entry["model"] == "MiniMax-M3"
+    assert entry["provider"] == DEFAULT_PROVIDER_ID
+    assert entry["model"] == DEFAULT_MODEL_ID

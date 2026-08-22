@@ -2,7 +2,12 @@
 
 import pytest
 
-from hpcu.gateway.gateway import Gateway, GatewayResponse
+from hpcu.gateway.gateway import (
+    Gateway,
+    GatewayResponse,
+    ModelCallPurpose,
+)
+from hpcu.runtime_config import configured_semantic_identity
 
 
 @pytest.mark.unit
@@ -30,8 +35,23 @@ def test_gateway_response_fields_default():
 
 
 class _ConcreteGateway(Gateway):
-    def call(self, prompt: str, system_prompt: str = "") -> GatewayResponse:
-        return GatewayResponse(content=f"echo:{prompt}", model="fake")
+    @property
+    def provider_id(self) -> str:
+        return "minimax"
+
+    @property
+    def model_id(self) -> str:
+        return "MiniMax-M3"
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
+        return GatewayResponse(content=f"echo:{prompt}", model="MiniMax-M3")
 
 
 @pytest.mark.unit
@@ -43,6 +63,12 @@ def test_gateway_abstract_cannot_be_instantiated():
 
 
 @pytest.mark.unit
+def test_gateway_identity_matches_configured_deployment():
+    gateway = _ConcreteGateway()
+    gateway.require_configured_identity(configured_semantic_identity())
+
+
+@pytest.mark.unit
 def test_gateway_concrete_implementation_calls():
     """Given a concrete Gateway, call() returns a GatewayResponse."""
     # Given
@@ -51,4 +77,4 @@ def test_gateway_concrete_implementation_calls():
     response = gateway.call("ping", system_prompt="be brief")
     # Then
     assert response.content == "echo:ping"
-    assert response.model == "fake"
+    assert response.model == "MiniMax-M3"

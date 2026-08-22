@@ -20,6 +20,22 @@ from hpcu.schemas.coordinates import ScreenPoint
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.ui_element import UIElement
 
+_COMMAND_TO_OP = {
+    "invoke": ActionOp.INVOKE,
+    "click": ActionOp.CLICK,
+    "double_click": ActionOp.DOUBLE_CLICK,
+    "right_click": ActionOp.RIGHT_CLICK,
+    "type": ActionOp.TYPE,
+    "replace_text": ActionOp.REPLACE_TEXT,
+    "key": ActionOp.HOTKEY,
+    "hotkey": ActionOp.HOTKEY,
+    "select": ActionOp.SELECT,
+    "toggle": ActionOp.TOGGLE,
+    "scroll": ActionOp.SCROLL,
+    "drag": ActionOp.DRAG,
+    "focus": ActionOp.FOCUS_WINDOW,
+}
+
 
 # Op -> injector command name.  The value is what InputInjector.semantic()
 # and InputInjector.physical() understand.  Ops that are postcondition-only
@@ -135,8 +151,11 @@ class Executor:
                 return semantic_result
 
         if prepared.physical_point is not None:
+            typed = prepared.action.value or prepared.action.key
             return await self._injector.physical(
-                prepared.physical_point, prepared.command
+                prepared.physical_point,
+                prepared.command,
+                text=typed,
             )
 
         return ExecutionResult(
@@ -144,6 +163,27 @@ class Executor:
             mode="physical",
             failure_code=FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value,
         )
+
+    async def inject_physical(
+        self,
+        point: ScreenPoint,
+        command: str,
+        text: str | None = None,
+    ) -> ExecutionResult:
+        """Run a physical injector command through the Action DSL.
+
+        Case loops and recovery use this instead of talking to an OS
+        injector. Adapters still only see (point, command, text).
+        """
+        op = _COMMAND_TO_OP.get(command, ActionOp.CLICK)
+        action = Action(
+            id=f"physical-{command}",
+            op=op,
+            value=text,
+            key=text if op is ActionOp.HOTKEY else None,
+        )
+        prepared = self.prepare(action, None, physical_point=point)
+        return await self.execute(prepared)
 
     async def wait_until(
         self,

@@ -1,0 +1,6 @@
+{
+  "prompt": "You are the sole semantic action decision-maker. Return exactly one JSON object with these keys: schema_version, scene_version, action, target_id, value, key, goal_state, confidence, reason_code, expected_postcondition. Use only a target id listed in Candidates. Current scene_version: 5\nGoal: 구글에서 노트북을 검색해줘\nCandidates:\nocr_line_0: Google laptop notebook under 2000000 KRW x Beaad icg Korean English @ < 라 은 ep x\nocr_line_1: 씨 모드 전체 쇼핑 이미지 짧은 동영상 nA 동영상 더보기 Spe\nocr_line_2: > Ane\nocr_line_3: Looking for results in English? 00\nocr_line_4: With a budget under 2,000,000 KRW, you can buy a powerful, high-quality laptop i\nocr_line_5: South Korea. & Alibaba.com © Alibaba.com 시미 #20144 48\nocr_line_6: Excellent choices include the Apple MacBook Air (M2 or M3), Samsung Galaxy Book4\nocr_line_7: Pro, LG Gram, or Lenovo Yoga/Legion series, offering great performance, long bat\nocr_line_8: life, and local support, © Albsbacom prices\nocr_line_9: Top Choices + Under 2 Million ye KRW @ YouTube i\nocr_line_10: [ Recommendations for Laptops 『0 만 원 이\nocr_line_11: * Apple MacBook Air (M2/M3): Best for smooth everyday use, amazing battery life,\nocr_line_12: 더보기 ~\nocr_line_13: 동영상 : 별",
+  "content": "\n\n",
+  "model": "MiniMax-M3",
+  "provider": "minimax"
+}

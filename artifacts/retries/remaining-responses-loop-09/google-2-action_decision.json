@@ -1,0 +1,6 @@
+{
+  "prompt": "You are the sole semantic action decision-maker. Return exactly one JSON object with these keys: schema_version, scene_version, action, target_id, value, key, goal_state, confidence, reason_code, expected_postcondition. Use only a target id listed in Candidates. Current scene_version: 3\nGoal: 구글에서 노트북을 검색해줘\nCandidates:\nocr_line_0: AGS Google 전체 쇼핑 laptop 이미지 notebook 짧은 동영상 under FA 2000000 동영상 KRW 더보기 x BLA <\nocr_line_1: - a |\nocr_line_2: 동영상 : 7",
+  "content": "\n\n",
+  "model": "MiniMax-M3",
+  "provider": "minimax"
+}

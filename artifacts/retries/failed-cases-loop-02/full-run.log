@@ -1,0 +1,243 @@
+CASE_START google-search-notebook-retry
+CASE_END google-search-notebook-retry success=False actions=0 model_calls=1 model_errors=0 failure=model_failed
+CASE_START bbc-news-retry
+CASE_END bbc-news-retry success=False actions=0 model_calls=1 model_errors=1 failure=model_failed
+CASE_START duckduckgo-linux-retry
+CASE_END duckduckgo-linux-retry success=False actions=0 model_calls=1 model_errors=0 failure=model_failed
+CASE_START github-explore-retry
+CASE_END github-explore-retry success=False actions=0 model_calls=1 model_errors=0 failure=model_failed
+CASE_START wikipedia-python-retry
+CASE_END wikipedia-python-retry success=False actions=0 model_calls=1 model_errors=0 failure=model_failed
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "cases": [
+    {
+      "case_id": "google-search-notebook-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 0,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 904,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 1,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 848,
+          "provider": "minimax",
+          "response_tokens": 904,
+          "latency_ms": 3100,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 3100,
+      "attempts_detail": []
+    },
+    {
+      "case_id": "bbc-news-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 0,
+      "model_call_count": 1,
+      "model_error_count": 1,
+      "model_tokens": 0,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 2,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 0,
+          "latency_ms": 0,
+          "error": "ReadTimeout"
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 5005,
+      "attempts_detail": []
+    },
+    {
+      "case_id": "duckduckgo-linux-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 0,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 726,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 3,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 824,
+          "provider": "minimax",
+          "response_tokens": 726,
+          "latency_ms": 3321,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 3321,
+      "attempts_detail": []
+    },
+    {
+      "case_id": "github-explore-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 0,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 713,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 4,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 713,
+          "latency_ms": 4521,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 4521,
+      "attempts_detail": []
+    },
+    {
+      "case_id": "wikipedia-python-retry",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 0,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 624,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 5,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 856,
+          "provider": "minimax",
+          "response_tokens": 624,
+          "latency_ms": 1628,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 1628,
+      "attempts_detail": []
+    }
+  ],
+  "totals": {
+    "cases": 5,
+    "successes": 0,
+    "action_count": 0,
+    "model_call_count": 5,
+    "model_error_count": 1,
+    "model_tokens": 2967,
+    "compile_call_count": 5,
+    "grounding_call_count": 0,
+    "purpose_call_counts": {
+      "plan_compile": 5,
+      "situation_analysis": 0,
+      "action_decision": 0,
+      "post_action_reanalysis": 0,
+      "recovery_reanalysis": 0
+    }
+  }
+}

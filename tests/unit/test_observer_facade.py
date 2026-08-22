@@ -6,6 +6,7 @@ Fake backends only; no real OS pixel capture or accessibility trees.
 import pytest
 
 from hpcu.capture.backend import CaptureBackend, CaptureCapabilities
+from hpcu.capture.frame_store import FrameStore
 from hpcu.observation.facade import CompositeObserver
 from hpcu.schemas.scene import SceneDelta
 from hpcu.observation.structure_observer import (
@@ -233,3 +234,55 @@ async def test_fingerprint_keeps_element_id_across_native_id_change():
     assert second.added == ()
     assert second.removed == ()
     assert second.modified[0].id == "native_a"
+
+
+class _FakePerception:
+    def elements_from_frame(self, frame, scene_version, roi=None):
+        return (
+            UIElement(
+                id="ocr_line_0",
+                scene_version=scene_version,
+                text="12,900원",
+                name="12,900원",
+            ),
+        )
+
+
+@pytest.mark.unit
+async def test_observe_merges_injected_perception_elements():
+    observer = CompositeObserver(
+        "test-session",
+        FakeCapture(),
+        FakeStructure(),
+        perception=_FakePerception(),
+    )
+    delta = await observer.observe()
+    ids = {element.id for element in delta.added}
+    assert "btn_1" in ids
+    assert "ocr_line_0" in ids
+
+
+@pytest.mark.unit
+async def test_auto_perception_with_store_does_not_raise():
+    class StoredCapture(FakeCapture):
+        def __init__(self):
+            super().__init__()
+            self.store = FrameStore()
+
+        async def grab(self) -> FrameHandle:
+            handle = await super().grab()
+            self.store.put(
+                handle.shm_id,
+                (
+                    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00"
+                    b"\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x01\x00"
+                    b"\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+                ),
+            )
+            return handle
+
+    observer = CompositeObserver("test-session", StoredCapture(), FakeStructure())
+    delta = await observer.observe()
+    assert delta.frame is not None
+    assert any(element.id == "btn_1" for element in delta.added)

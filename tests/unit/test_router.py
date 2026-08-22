@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from hpcu.gateway.gateway import Gateway, GatewayResponse
+from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
 from hpcu.router.candidate_scoring import TargetQuery
 from hpcu.router.router import (
     Decision,
@@ -228,12 +228,30 @@ class _TrackingGateway(Gateway):
 
     def __init__(self):
         self.call_count = 0
+        self.purposes: list[ModelCallPurpose] = []
 
-    def call(self, prompt: str, system_prompt: str = "") -> GatewayResponse:
+    @property
+    def provider_id(self) -> str:
+        return "minimax"
+
+    @property
+    def model_id(self) -> str:
+        return "MiniMax-M3"
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
         self.call_count += 1
+        self.purposes.append(purpose)
         return GatewayResponse(
             content='{"target_id": "model_target", "confidence": 0.9}',
             model="MiniMax-M3",
+            provider="minimax",
             tokens_used=10,
             latency_ms=5,
         )

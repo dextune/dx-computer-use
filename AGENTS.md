@@ -19,6 +19,15 @@ Windows, Linux(호스트·Docker), macOS, 브라우저, VNC는 플러그인이�
 5. **stale이면 실행하지 않는다.** 화면이 바뀌면 재탐색하거나 halt.
 6. **없는 capability는 숨기지 않는다.** `UNSUPPORTED`를 반환한다.
 7. **고위험은 승인 없이 안 된다.** 결제·삭제·권한.
+8. **사이트·CTA 사전을 코드에 넣지 않는다.** 검출 셋은 목표마다 편찬한다. 원문: `docs/plan/14-goal-compiled-targeting.md`.
+9. **의미 판단은 설정된 semantic provider만 한다.** 다른 LLM/VLM/provider, Grok, 로컬 휴리스틱은 target·상황·케이스 분류·성공·복구를 결정하지 않는다. 현재 기본 배포는 설정의 MiniMax-M3일 뿐이며, provider/model identity와 응답 schema가 맞지 않으면 fail closed 한다.
+10. **화면 제어가 제품의 기본 경계다.** 브라우저·터미널·앱은 Capture → CPU Perception → Scene Graph → configured semantic provider Decision → Policy → `InputInjector.physical` → 재캡처 순서로 다룬다. DOM/CDP/API/직접 파일·stdout 검사는 화면 제어를 대신하지 않는다.
+11. **CPU Perception은 중립 관찰만 만든다.** OCR, bbox, geometry, window structure, scene delta, hash는 허용하지만 “이것을 클릭”, “성공”, “CAPTCHA” 같은 의미 결론을 단독으로 만들지 않는다.
+12. **모델 장애 시 꼼수를 쓰지 않는다.** configured semantic provider의 timeout·오류·schema 불일치·stale 응답이면 임의 target/fallback click을 실행하지 않고 `MODEL_FAILED`/`DECISION_REQUIRED`로 중단·재분석한다. Targeting fallback tokenizer는 어휘 생성에만 사용한다.
+13. **행동 전후에 증거를 남긴다.** action 전 scene version을 검증하고 action 후 새 화면을 캡처·분석한다. 모델의 “완료” 문장이나 low-level click `ok`만으로 성공 보고하지 않는다.
+14. **CAPTCHA·로그인·보안 확인은 우회하지 않는다.** solver, refresh 반복, alternate site/endpoint, credential 입력으로 접근 통제를 피하지 않고 `BLOCKED`/`HUMAN_HANDOFF`로 중단한다.
+15. **터미널 AI 코딩은 격리된 화면 테스트일 뿐이다.** OpenCode는 terminal 안에서 사용자가 물리 입력으로 실행하도록 테스트할 수 있지만 HPCU의 semantic decision-maker가 아니다. sandbox/worktree 밖 파일·secret·destructive command를 사용하지 않는다.
+16. **테스트 성공을 위해 케이스별 정답을 하드코딩하지 않는다.** goal/fixtures 이외의 site·CTA·OCR·좌표·광고·challenge 문자열, 정답 element ID를 production action path에 추가하지 않는다.
 
 ---
 
@@ -84,6 +93,8 @@ Structure (OS) ↗                         ↓
 - 채널은 bounded queue. 오래된 프레임 폐기, 최신 우선.
 - Scene은 delta만 전파.
 - 임계값·timeout·confidence는 `config/*.yaml`. 코드 하드코딩 금지.
+- 사이트·브랜드·CTA·봇·동의 문자열 사전 금지. 목표 편찬 TargetingPack만. 원문: `docs/plan/14-goal-compiled-targeting.md`.
+- 실행 루프 정상 경로 0 call. 목표 편찬은 태스크당 configured semantic provider ≤1 (plan-time).
 - 고정 `time.sleep` 금지. settle detector / `wait_until`.
 
 **플랫폼**

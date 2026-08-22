@@ -27,7 +27,7 @@ class FakeInjector(InputInjector):
         self.semantic_calls.append(element.id)
         return ExecutionResult(success=True, mode="semantic")
 
-    async def physical(self, point, action: str) -> ExecutionResult:
+    async def physical(self, point, action: str, text: str | None = None) -> ExecutionResult:
         return ExecutionResult(success=True, mode="physical")
 
     def capabilities(self) -> InputCapabilities:

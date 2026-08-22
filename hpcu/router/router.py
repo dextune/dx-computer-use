@@ -20,9 +20,9 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from hpcu.gateway.gateway import Gateway
+from hpcu.gateway.gateway import Gateway, ModelCallPurpose
 from hpcu.router.candidate_scoring import TargetQuery, score_candidates
-from hpcu.runtime_config import load_runtime_config
+from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
@@ -48,6 +48,31 @@ class Decision:
     def is_stale(self, current_scene_version: int) -> bool:
         """True when the decision's grounding is older than the current scene."""
         return self.scene_version < current_scene_version
+
+
+def _has_unique_confidence_margin(
+    scored: list[object], minimum_margin: float = 0.20
+) -> bool:
+    """Require a meaningful lead before a model-free direct decision."""
+    if not scored:
+        return False
+    if len(scored) == 1:
+        return True
+    return float(scored[0].confidence) - float(scored[1].confidence) >= minimum_margin
+
+
+def _has_observable_text(candidate: UIElement | None) -> bool:
+    return bool(candidate and (candidate.text or candidate.name or "").strip())
+
+
+def _element_is_current(candidate: UIElement | None, scene_version: int) -> bool:
+    return bool(
+        candidate
+        and candidate.scene_version == scene_version
+        and candidate.state.visible
+        and candidate.state.enabled
+        and not candidate.state.occluded
+    )
 
 
 def _query_from(node: object) -> TargetQuery:
@@ -115,7 +140,13 @@ class EscalationStrategy:
         scored = score_candidates(candidates, query)
         best = scored[0] if scored else None
 
-        if best is not None and best.confidence >= self.direct_threshold:
+        if (
+            best is not None
+            and best.confidence >= self.direct_threshold
+            and _has_unique_confidence_margin(scored)
+            and _has_observable_text(scene.get(best.element_id))
+            and _element_is_current(scene.get(best.element_id), scene.version)
+        ):
             return Decision(
                 target_id=best.element_id,
                 confidence=best.confidence,
@@ -203,6 +234,10 @@ class ModelRouter:
                 f"got {direct_threshold}"
             )
 
+        self._semantic_identity = configured_semantic_identity(config)
+        if gateway is not None:
+            gateway.require_configured_identity(self._semantic_identity)
+
         self._model_call_budget = model_call_budget
         self._model_calls_remaining = model_call_budget
         self._direct_threshold = direct_threshold
@@ -269,12 +304,24 @@ class ModelRouter:
             raise RuntimeError("no gateway configured for model tier")
 
         prompt = self._build_prompt(node, scene, candidates)
-        response = self._gateway.call(prompt, system_prompt=self._system_prompt)
+        response = self._gateway.call(
+            prompt,
+            system_prompt=self._system_prompt,
+            purpose=ModelCallPurpose.ACTION_DECISION,
+        )
         self._model_calls_remaining -= 1
+        if response.model != self._semantic_identity.model_id:
+            raise ValueError(f"unexpected semantic model: {response.model!r}")
+        if (
+            response.provider
+            and response.provider != self._semantic_identity.provider_id
+        ):
+            raise ValueError(f"unexpected semantic provider: {response.provider!r}")
 
         parsed = _parse_target(response.content)
+        target_id = parsed.get("target_id")
         return Decision(
-            target_id=parsed.get("target_id"),
+            target_id=target_id,
             confidence=float(parsed.get("confidence", 0.0)),
             scene_version=scene.version,
         )

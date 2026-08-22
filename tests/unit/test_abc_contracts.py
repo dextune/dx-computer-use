@@ -91,8 +91,10 @@ class FakeInputInjector(InputInjector):
         self.semantic_calls.append((element.id, action))
         return ExecutionResult(success=True, mode="semantic")
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
-        self.physical_calls.append((point.x, point.y, action))
+    async def physical(
+        self, point: ScreenPoint, action: str, text: str | None = None
+    ) -> ExecutionResult:
+        self.physical_calls.append((point.x, point.y, action, text))
         return ExecutionResult(success=True, mode="physical")
 
     def capabilities(self) -> InputCapabilities:
@@ -113,7 +115,9 @@ class FakeInputInjectorUnsupported(InputInjector):
         return ExecutionResult(success=False, mode="semantic",
                                failure_code="input_semantic_unsupported")
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
+    async def physical(
+        self, point: ScreenPoint, action: str, text: str | None = None
+    ) -> ExecutionResult:
         return ExecutionResult(success=True, mode="physical")
 
     def capabilities(self) -> InputCapabilities:

@@ -12,10 +12,11 @@ from hpcu.cases.runner import CaseRunner
 from hpcu.cases.specs import load_cases
 from hpcu.cases.stats import CountingGateway, dumps_stats
 from hpcu.executor.executor import Executor
-from hpcu.gateway.minimax_adapter import MiniMaxAdapter, load_minimax_api_key
+from hpcu.gateway.registry import create_gateway
 from hpcu.grounder.grounder import Grounder
 from hpcu.observation.facade import CompositeObserver
 from hpcu.platform.linux.sandbox import create_sandbox_backends, probe
+from hpcu.runtime_config import load_runtime_config
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -37,26 +38,40 @@ async def _run(args: argparse.Namespace) -> int:
     if not probe(args.base_url):
         print("sandbox unreachable", file=sys.stderr)
         return 2
-    if not load_minimax_api_key():
-        print("MINIMAX_API_KEY is not set", file=sys.stderr)
+    runtime_config = load_runtime_config()
+    try:
+        gateway = CountingGateway(create_gateway(runtime_config))
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
         return 2
     capture, structure, injector = create_sandbox_backends(
         "shopping", base_url=args.base_url
     )
     observer = CompositeObserver("shopping", capture, structure)
     executor = Executor(injector)
-    gateway = CountingGateway(MiniMaxAdapter.from_env())
-    runner = CaseRunner(observer, executor, Grounder(), gateway)
+    runner = CaseRunner(observer, executor, Grounder(), gateway, config=runtime_config)
     rows = []
     for spec in specs:
         print(f"CASE_START {spec.id}", flush=True)
         stats = await runner.run_case(spec)
         rows.append(stats)
+        case_path = args.out / f"{spec.id}.json"
+        evidence_frame_id = stats.evidence_frame_id
+        if evidence_frame_id and evidence_frame_id in capture.store:
+            frame_path = args.out / f"{spec.id}-evidence.png"
+            frame_path.write_bytes(capture.store.get(evidence_frame_id))
+            stats.artifact_manifest.append(str(frame_path))
+        stats.artifact_manifest.append(str(case_path))
+        case_path.write_text(
+            json.dumps(stats.__dict__, ensure_ascii=False, default=str, indent=2)
+            + "\n",
+            encoding="utf-8",
+        )
         print(
             f"CASE_END {spec.id} success={stats.success} "
             f"actions={stats.action_count} "
-            f"minimax={stats.minimax_call_count} "
-            f"errors={stats.minimax_error_count} "
+            f"model_calls={stats.model_call_count} "
+            f"model_errors={stats.model_error_count} "
             f"failure={stats.failure}",
             flush=True,
         )

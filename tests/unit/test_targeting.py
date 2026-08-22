@@ -5,7 +5,9 @@ All T1 components — model 0 call, pure data, pure string processing.
 
 import pytest
 
-from hpcu.compiler.targeting_compiler import GoalFallbackTokenizer
+from hpcu.cases.stats import DEFAULT_PROVIDER_ID, CountingGateway
+from hpcu.compiler.targeting_compiler import GoalFallbackTokenizer, TargetingCompiler
+from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
 from hpcu.perception.matcher import GenericMatcher, mentions
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace
 from hpcu.schemas.scene import Scene
@@ -129,7 +131,12 @@ def _scene(*elements: UIElement) -> Scene:
 
 
 def _element(
-    id: str, text: str, x: float = 10, y: float = 200, width: float = 200, height: float = 20
+    id: str,
+    text: str,
+    x: float = 10,
+    y: float = 200,
+    width: float = 200,
+    height: float = 20,
 ) -> UIElement:
     return UIElement(
         id=id,
@@ -268,9 +275,6 @@ def test_same_scene_different_pack_different_outcome():
 
 # ── TargetingCompiler (T2) ──────────────────────────────────────────
 
-from hpcu.cases.stats import CountingGateway
-from hpcu.compiler.targeting_compiler import TargetingCompiler
-from hpcu.gateway.gateway import Gateway, GatewayResponse
 
 
 class _FakeGateway(Gateway):
@@ -280,19 +284,39 @@ class _FakeGateway(Gateway):
         self.content = content
         self.error = error
         self.prompts: list[str] = []
+        self.purposes: list[ModelCallPurpose] = []
 
-    def call(self, prompt: str, system_prompt: str = "") -> GatewayResponse:
+    @property
+    def provider_id(self) -> str:
+        return DEFAULT_PROVIDER_ID
+
+    @property
+    def model_id(self) -> str:
+        return "MiniMax-M3"
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
         self.prompts.append(prompt)
+        self.purposes.append(purpose)
         if self.error:
             raise RuntimeError("gateway down")
         return GatewayResponse(
-            content=self.content, model="MiniMax-M3", tokens_used=42
+            content=self.content,
+            model="MiniMax-M3",
+            provider=DEFAULT_PROVIDER_ID,
+            tokens_used=42,
         )
 
 
 @pytest.mark.unit
 def test_compiler_valid_json_response():
-    """Compiler accepts valid JSON and returns a Minimax-sourced pack."""
+    """Compiler accepts valid JSON and returns a model-sourced pack."""
     inner = _FakeGateway(
         content='{"ready_any":["쿠팡","원"],"success_any":["장바구니"],'
         '"forbid_any":["결제"],"pick_query":"생수","pick_required":true,'
@@ -301,7 +325,7 @@ def test_compiler_valid_json_response():
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘", "https://example.com")
-    assert pack.source == "minimax"
+    assert pack.source == "model"
     assert pack.goal_id == "case-1"
     assert pack.ready_any == ("쿠팡", "원")
     assert pack.success_any == ("장바구니",)
@@ -354,9 +378,21 @@ def test_compiler_strips_thinking_tags():
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    assert pack.source == "minimax"
+    assert pack.source == "model"
     assert pack.ready_any == ("쿠팡",)
     assert pack.pick_query == "생수"
+
+
+@pytest.mark.unit
+def test_compiler_rejects_non_boolean_pick_required():
+    inner = _FakeGateway(
+        content='{"ready_any":["ready"],"success_any":["done"],'
+        '"pick_query":"item","pick_required":"false"}'
+    )
+    gateway = CountingGateway(inner)
+    compiler = TargetingCompiler(gateway)
+    pack = compiler.compile("case-1", "item을 열어줘")
+    assert pack.source == "goal_tokens"
 
 
 @pytest.mark.unit
@@ -366,8 +402,8 @@ def test_compiler_schema_mismatch_falls_back():
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
     pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    # Valid JSON with no targeting fields produces minimax pack with defaults
-    assert pack.source == "minimax"
+    # Valid JSON with no targeting fields produces model pack with defaults
+    assert pack.source == "model"
     assert pack.ready_any == ()
     assert pack.pick_query == ""
 

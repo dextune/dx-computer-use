@@ -34,7 +34,7 @@ class BrowserInputInjector(InputInjector):
             failure_code=FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value,
         )
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
+    async def physical(self, point: ScreenPoint, action: str, text: str | None = None) -> ExecutionResult:
         return ExecutionResult(
             success=False,
             mode="physical",

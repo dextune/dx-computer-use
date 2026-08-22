@@ -1,0 +1,6 @@
+{
+  "purpose": "plan_compile",
+  "model": "MiniMax-M3",
+  "provider": "minimax",
+  "content": "{\n  \"ready_any\": [\"DuckDuckGo\", \"Search DuckDuckGo\", \"duckduckgo.com\"],\n  \"success_any\": [\"Linux\", \"kernel\", \"penguin\", \"Ubuntu\", \"operating system\"],\n  \"forbid_any\": [\"Error\", \"404\", \"Google\", \"captcha\", \"Access Denied\"],\n  \"pick_query\": \"Search DuckDuckGo search box\",\n  \"pick_required\": true,\n  \"dismiss_any\": [\"Accept\", \"Agree\", \"Privacy\", \"Consent\", \"Got it"
+}

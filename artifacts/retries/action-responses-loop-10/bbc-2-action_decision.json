@@ -1,0 +1,4 @@
+{
+  "prompt": "You are the sole semantic action decision-maker. Return exactly one compact JSON object with no markdown, commentary, or code fences. Use null for target_id/value/key when not applicable. Keys: schema_version, scene_version, action, target_id, value, key, goal_state, confidence, reason_code, expected_postcondition. Use only a target id listed in Candidates. Current scene_version: 3\nGoal: BBC 뉴스 메인 페이지를 열어줘\nCandidates:\nocr_line_0: =a Hog soon |\nocr_line_1: Home News Sport Business Technology Health Culture Arts Travel Earth Audio Video\nocr_line_2: Useccanda UK Afica Asn Auta Europe LatnAmerce Mislefast InP @8CInDepth . 0006\nocr_line_3: Canada says it will . =)\nocr_line_4: match US tariffs fu\nocr_line_5: 404%... f... 게이 세게 이을 이의 i= 때",
+  "content": "\n\n"
+}

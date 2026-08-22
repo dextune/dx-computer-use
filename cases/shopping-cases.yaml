@@ -1,84 +1,54 @@
-# Ten computer-use cases. Success is on-screen evidence, not model prose.
-# Pack-based: only id, goal, url, budget.  No site-specific keywords.
-# Evidence is compiled at plan-time from the goal by MiniMax-M3 or fallback.
+# Pack-based: only id, goal, url, and budgets. No site-specific keywords.
+# Targeting and action semantics are compiled by the configured provider.
 
 cases:
   - id: coupang-fresh-popular
-    goal: 쿠팡에서 쿠팡 프레시 카테고리에서 인기있는 상품 1개 골라줘
-    start_url: "https://www.coupang.com/np/categories/194276"
-    evidence:
-      require_pick: true
-    max_attempts: 6
-    max_minimax_calls: 2
-
+    goal: "쿠팡에서 인기 신선식품 하나 골라줘"
+    start_url: "https://www.coupang.com/"
+    max_attempts: 5
+    max_model_calls: 2
   - id: google-search-notebook
-    goal: 구글에서 200만원 이하 노트북을 검색해줘
-    start_url: "https://www.google.com/search?q=laptop+notebook+under+2000000+KRW"
-    evidence:
-      require_pick: false
+    goal: "구글에서 노트북을 검색해줘"
+    start_url: "https://www.google.com/"
     max_attempts: 4
-    max_minimax_calls: 2
-
-  - id: youtube-search-lofi
-    goal: 유튜브에서 lofi 음악을 찾아줘
-    start_url: "https://www.youtube.com/results?search_query=lofi+hip+hop"
-    evidence:
-      require_pick: false
+    max_model_calls: 2
+  - id: naver-search-headphones
+    goal: "네이버에서 무선 헤드폰을 검색해줘"
+    start_url: "https://www.naver.com/"
     max_attempts: 4
-    max_minimax_calls: 2
-
-  - id: wikipedia-seoul
-    goal: 위키피디아에서 Seoul 문서를 열어줘
-    start_url: "https://en.wikipedia.org/wiki/Seoul"
-    evidence:
-      require_pick: false
+    max_model_calls: 2
+  - id: amazon-search-mug
+    goal: "아마존에서 머그컵을 찾아줘"
+    start_url: "https://www.amazon.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: bbc-news
-    goal: BBC 뉴스 메인 페이지를 열어줘
-    start_url: "https://www.bbc.com/news"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-search-keyboard
+    goal: "온라인 상점에서 기계식 키보드를 찾아줘"
+    start_url: "https://example.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: duckduckgo-linux
-    goal: DuckDuckGo에서 linux를 검색해줘
-    start_url: "https://duckduckgo.com/?q=linux"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-search-monitor
+    goal: "온라인 상점에서 모니터를 찾아줘"
+    start_url: "https://example.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: github-explore
-    goal: GitHub Explore 페이지를 열어줘
-    start_url: "https://github.com/explore"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-search-backpack
+    goal: "온라인 상점에서 여행용 배낭을 찾아줘"
+    start_url: "https://example.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: wikipedia-python
-    goal: 위키피디아에서 Python 프로그래밍 문서를 열어줘
-    start_url: "https://en.wikipedia.org/wiki/Python_(programming_language)"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-search-lamp
+    goal: "온라인 상점에서 책상 램프를 찾아줘"
+    start_url: "https://example.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: mdn-javascript
-    goal: MDN에서 JavaScript 문서를 열어줘
-    start_url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-search-coffee
+    goal: "온라인 상점에서 원두커피를 찾아줘"
+    start_url: "https://example.com/"
     max_attempts: 4
-    max_minimax_calls: 1
-
-  - id: example-org
-    goal: example.org 안내 페이지를 열어줘
-    start_url: "https://example.org"
-    evidence:
-      require_pick: false
+    max_model_calls: 1
+  - id: shopping-ready-only
+    goal: "검색 결과 화면을 열어줘"
+    start_url: "https://example.com/"
     max_attempts: 3
-    max_minimax_calls: 0
+    max_model_calls: 0

@@ -27,6 +27,12 @@ def test_strip_thinking_removes_reasoning_block():
 
 
 @pytest.mark.unit
+def test_strip_thinking_removes_leading_prose_before_json():
+    content = "Here is the requested JSON:\n{\"action\": \"none\"}"
+    assert strip_thinking(content) == '{"action": "none"}'
+
+
+@pytest.mark.unit
 def test_strip_thinking_no_block_unchanged():
     """Given content without a thinking block, it is unchanged."""
     # Given

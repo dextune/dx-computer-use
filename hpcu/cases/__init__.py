@@ -1,8 +1,10 @@
 from hpcu.cases.runner import CaseRunner, evidence_holds
 from hpcu.cases.specs import CaseSpec, EvidenceSpec, load_cases
 from hpcu.cases.stats import (
-    MINIMAX_MODEL,
+    DEFAULT_MODEL_ID,
+    DEFAULT_PROVIDER_ID,
     ActionRecord,
+    AttemptRecord,
     CaseStats,
     CountingGateway,
     aggregate,
@@ -11,12 +13,14 @@ from hpcu.cases.stats import (
 
 __all__ = [
     "ActionRecord",
+    "AttemptRecord",
     "CaseRunner",
     "CaseSpec",
     "CaseStats",
     "CountingGateway",
     "EvidenceSpec",
-    "MINIMAX_MODEL",
+    "DEFAULT_MODEL_ID",
+    "DEFAULT_PROVIDER_ID",
     "aggregate",
     "dumps_stats",
     "evidence_holds",

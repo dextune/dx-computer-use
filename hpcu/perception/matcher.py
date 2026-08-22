@@ -7,6 +7,7 @@ by the pack's tokens using normalize_ocr_text for comparison.
 from __future__ import annotations
 
 from hpcu.perception.engine import normalize_ocr_text
+from hpcu.perception.window_chrome import is_in_chrome, primary_window
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.targeting import TargetingPack
 from hpcu.schemas.ui_element import UIElement
@@ -80,9 +81,14 @@ class GenericMatcher:
         if not self._pack.pick_query:
             return []
         query = normalize_ocr_text(self._pack.pick_query).replace(" ", "")
+        window = primary_window(scene)
+        if window is not None and window.role != "window":
+            window = None
         matches: list[UIElement] = []
         for element in scene.elements.values():
-            if element.bbox is None:
+            if element.bbox is None or (
+                window is not None and is_in_chrome(element, window)
+            ):
                 continue
             blob = normalize_ocr_text(
                 f"{element.text or ''} {element.name or ''}"

@@ -13,7 +13,9 @@ def test_minimax_m3_ping_from_env():
     adapter = MiniMaxAdapter.from_env()
     response = adapter.call(
         "Reply with the single word pong and nothing else.",
-        max_tokens=32,
+        # MiniMax-M3 emits reasoning before the visible answer; reserve enough
+        # output budget for both phases so the live smoke test is deterministic.
+        max_tokens=256,
     )
     assert response.content
     assert "pong" in response.content.lower()

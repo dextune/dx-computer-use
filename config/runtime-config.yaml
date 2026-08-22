@@ -1,6 +1,21 @@
 # HPCU Runtime — 기본 임계값. 하드코딩 금지.
 # Phase 종료 시 실측값으로 교체.
 
+semantic:
+  default_provider: minimax
+  default_model: MiniMax-M3
+  request_limits:
+    plan_compile_max_tokens: 1024
+    action_decision_max_tokens: 512
+    reanalysis_max_tokens: 512
+    plan_compile_retry_attempts: 2
+  routes:
+    plan_compile: minimax
+    situation_analysis: minimax
+    action_decision: minimax
+    post_action_reanalysis: minimax
+    recovery_reanalysis: minimax
+
 confidence:
   local_execute_threshold: 0.88
   local_margin_min: 0.20
@@ -37,3 +52,4 @@ cases:
   navigate_poll_interval_ms: 400
   post_click_timeout_ms: 5000
   post_click_poll_interval_ms: 300
+  minimum_evidence_token_matches: 2

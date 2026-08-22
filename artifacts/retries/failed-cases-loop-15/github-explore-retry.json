@@ -1,0 +1,78 @@
+{
+  "case_id": "github-explore-retry",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "decision_required",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 11,
+  "final_frame_id": "sandbox-shopping-1787389696174552058",
+  "attempts": 2,
+  "max_attempts": 5,
+  "action_count": 17,
+  "model_call_count": 3,
+  "model_error_count": 0,
+  "model_tokens": 3017,
+  "compile_call_count": 1,
+  "grounding_call_count": 2,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=8', ok=True)",
+    "ActionRecord(kind='focus', detail='linux at DuckDuckGo - Chromium', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=9', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='capture', detail='attempt-1 v=10', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='model_schema', detail='strict_action_rejected', ok=False)",
+    "ActionRecord(kind='decision', detail='no_model_decision', ok=False)",
+    "ActionRecord(kind='capture', detail='attempt-2 v=11', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='goal_already_satisfied', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=5, purpose='plan_compile', model='MiniMax-M3', prompt_length=818, provider='minimax', response_tokens=796, latency_ms=3948, error='')",
+    "AiCallRecord(call_number=6, purpose='action_decision', model='MiniMax-M3', prompt_length=2133, provider='minimax', response_tokens=1228, latency_ms=3633, error='')",
+    "AiCallRecord(call_number=7, purpose='action_decision', model='MiniMax-M3', prompt_length=1688, provider='minimax', response_tokens=993, latency_ms=2027, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "evidence_scene_version": 11,
+  "evidence_frame_id": "sandbox-shopping-1787389696174552058",
+  "evidence_tokens": [
+    "Explore",
+    "Topics",
+    "Trending repositories",
+    "GitHub",
+    "Collections",
+    "Topic"
+  ],
+  "evidence_element_ids": [
+    "ocr_line_1",
+    "ocr_line_2"
+  ],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 14677,
+  "attempts_detail": [
+    "AttemptRecord(attempt=1, scene_version_start=10, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=False, model_call_start=5, model_call_end=6, failure='decision_required')",
+    "AttemptRecord(attempt=2, scene_version_start=11, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=True, model_call_start=6, model_call_end=7, failure='')"
+  ],
+  "artifact_manifest": [
+    "artifacts/retries/failed-cases-loop-15/github-explore-retry-evidence.png",
+    "artifacts/retries/failed-cases-loop-15/github-explore-retry.json"
+  ],
+  "decision_diagnostics": [
+    "action scene=10: ValueError: response must be one JSON object"
+  ]
+}

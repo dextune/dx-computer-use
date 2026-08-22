@@ -18,7 +18,9 @@ from typing import Any, Optional
 from urllib.parse import urljoin
 
 from hpcu.capture.backend import CaptureBackend, CaptureCapabilities
+from hpcu.capture.frame_store import FrameStore
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
+from hpcu.input.keys import ENTER, ESCAPE, FOCUS_LOCATION, NEW_TAB, PAGE_DOWN, SELECT_ALL
 from hpcu.observation.structure_observer import StructureCapabilities, StructureObserver
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace, ScreenPoint
@@ -28,22 +30,15 @@ from hpcu.schemas.ui_element import ElementSource, UIElement
 
 _DEFAULT_BASE_URL = "http://127.0.0.1:1337"
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
-
-
-class FrameStore:
-    """In-process PNG bytes keyed by shm_id. Never put bytes on FrameHandle."""
-
-    def __init__(self) -> None:
-        self._frames: dict[str, bytes] = {}
-
-    def put(self, shm_id: str, data: bytes) -> None:
-        self._frames[shm_id] = data
-
-    def get(self, shm_id: str) -> bytes:
-        return self._frames[shm_id]
-
-    def __contains__(self, shm_id: str) -> bool:
-        return shm_id in self._frames
+_PORTABLE_KEYS = {
+    ENTER: "Return",
+    "Return": "Return",
+    SELECT_ALL: "ctrl+a",
+    FOCUS_LOCATION: "ctrl+l",
+    ESCAPE: "Escape",
+    PAGE_DOWN: "Page_Down",
+    NEW_TAB: "ctrl+t",
+}
 
 
 def png_dimensions(data: bytes) -> tuple[int, int]:
@@ -165,13 +160,26 @@ class GrokSandboxInjector(InputInjector):
         self._client = client or SandboxHttpClient()
 
     async def semantic(self, element: UIElement, action: str) -> ExecutionResult:
+        if action in ("focus", "invoke") and element.sources:
+            ref = element.sources[0].ref
+            if ref:
+                activated = self._client.exec("xdotool", ["windowactivate", ref])
+                self._client.exec("xdotool", ["windowraise", ref])
+                ok = bool(activated.get("ok")) or activated.get("code") in (0, "0", None)
+                return ExecutionResult(
+                    success=ok,
+                    mode="semantic",
+                    failure_code=None if ok else FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value,
+                )
         return ExecutionResult(
             success=False,
             mode="semantic",
             failure_code=FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value,
         )
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
+    async def physical(
+        self, point: ScreenPoint, action: str, text: str | None = None
+    ) -> ExecutionResult:
         x = int(round(point.x))
         y = int(round(point.y))
         if action in ("click", "invoke"):
@@ -187,9 +195,13 @@ class GrokSandboxInjector(InputInjector):
                 "xdotool", ["mousemove", str(x), str(y), "click", "3"]
             )
         elif action in ("type", "replace_text"):
-            result = self._client.exec("xdotool", ["type", "--clearmodifiers", "--", str(x)])
-        elif action in ("key",):
-            result = self._client.exec("xdotool", ["key", str(x)])
+            result = self._client.exec(
+                "xdotool",
+                ["type", "--delay", "0", "--clearmodifiers", "--", text or ""],
+            )
+        elif action in ("key", "hotkey"):
+            mapped = _PORTABLE_KEYS.get(text or ENTER, text or "Return")
+            result = self._client.exec("xdotool", ["key", mapped])
         else:
             result = self._client.exec(
                 "xdotool", ["mousemove", str(x), str(y)]

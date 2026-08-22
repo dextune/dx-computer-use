@@ -8,10 +8,34 @@ from typing import Any, Optional
 
 import yaml
 
+from hpcu.gateway.gateway import SemanticIdentity
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PATH = _REPO_ROOT / "config" / "runtime-config.yaml"
 
 _DEFAULTS: dict[str, Any] = {
+    "semantic": {
+        "default_provider": "minimax",
+        "default_model": "MiniMax-M3",
+        "request_limits": {
+            "plan_compile_max_tokens": 1024,
+            "action_decision_max_tokens": 512,
+            "reanalysis_max_tokens": 512,
+            "plan_compile_retry_attempts": 2,
+        },
+        "routes": {
+            "plan_compile": "minimax",
+            "situation_analysis": "minimax",
+            "action_decision": "minimax",
+            "post_action_reanalysis": "minimax",
+            "recovery_reanalysis": "minimax",
+        },
+    },
+    # Backward-compatible alias for callers that only need the selected model.
+    "model": {
+        "semantic_model_id": "MiniMax-M3",
+        "provider": "minimax",
+    },
     "confidence": {
         "local_execute_threshold": 0.88,
         "local_margin_min": 0.20,
@@ -32,6 +56,20 @@ _DEFAULTS: dict[str, Any] = {
         "high_risk_require_approval": True,
         "max_retry_attempts": 3,
     },
+    "perception": {
+        "ocr_languages": "kor+eng",
+        "ocr_psm": 6,
+        "ocr_sparse_psm": 11,
+        "ocr_min_regions_for_dense": 8,
+        "line_y_tolerance_px": 8,
+    },
+    "cases": {
+        "navigate_settle_timeout_ms": 8000,
+        "navigate_poll_interval_ms": 400,
+        "post_click_timeout_ms": 5000,
+        "post_click_poll_interval_ms": 300,
+        "minimum_evidence_token_matches": 2,
+    },
 }
 
 
@@ -43,6 +81,38 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             merged[key] = value
     return merged
+
+
+def configured_semantic_identity(
+    config: Optional[dict[str, Any]] = None,
+) -> SemanticIdentity:
+    """Return the selected provider/model identity from runtime config."""
+    if config is None:
+        runtime = load_runtime_config()
+        semantic = runtime.get("semantic", {})
+        model = runtime.get("model", {})
+    else:
+        # Explicit injected model settings take precedence over repository
+        # defaults when the caller has not supplied the newer semantic block.
+        runtime = _deep_merge(_DEFAULTS, config)
+        explicit_semantic = config.get("semantic") or {}
+        explicit_model = config.get("model") or {}
+        if explicit_semantic:
+            semantic = _deep_merge(runtime.get("semantic", {}), explicit_semantic)
+            model = explicit_model
+        elif explicit_model:
+            semantic = {}
+            model = explicit_model
+        else:
+            semantic = runtime.get("semantic", {})
+            model = runtime.get("model", {})
+    provider_id = str(
+        semantic.get("default_provider", model.get("provider", ""))
+    ).strip()
+    model_id = str(
+        semantic.get("default_model", model.get("semantic_model_id", ""))
+    ).strip()
+    return SemanticIdentity(provider_id=provider_id, model_id=model_id)
 
 
 def load_runtime_config(path: Optional[Path] = None) -> dict[str, Any]:

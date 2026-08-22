@@ -1,0 +1,6 @@
+{
+  "purpose": "plan_compile",
+  "model": "MiniMax-M3",
+  "provider": "minimax",
+  "content": "\n\n{\"ready_any\":[\"Python\",\"programming language\",\"Wikipedia\",\"General-purpose\",\"high-level\",\"object-oriented\"],\"success_any\":[\"Python\",\"programming language\",\"Guido van Rossum\",\"high-level programming language\"],\"forbid_any\":[\"disambiguation\",\"snippet\",\"traceback\",\"Pythonidae\"],\"pick_query\":\"\",\"pick_required\":false,\"dismiss_any\":[\"Accept\",\"Accept all\",\"Reject\",\"Reject all\",\"I agree\",\"Agree\",\"Consent\",\"cookies\",\"privacy policy\",\"Got it\"],\"blocked_any\":[\"captcha\",\"blocked\",\"Access Denied\",\"Rate limit\",\"429\",\"Forbidden\",\"robot\"],\"ignore_any\":[\"navigation\",\"Contents\",\"Toggle the table of contents\",\"Create account\",\"Log in\",\"Talk\",\"View source\",\"View history\",\"Main page\",\"Main article\",\"Recent changes\",\"Random article\",\"About Wikipedia\",\"Contact Wikipedia\",\"Donate\",\"Help\",\"Learn to edit\",\"Community portal\",\"Upload file\",\"Special pages\",\"Permanent link\",\"Page information\",\"Cite this page\",\"Download as PDF\",\"Printable version\",\"In other projects\",\"Languages\",\"italiano\",\"español\",\"français\",\"deutsch\",\"日本語\",\"中文\",\"русский\",\"português\",\"한국어\"]}"
+}

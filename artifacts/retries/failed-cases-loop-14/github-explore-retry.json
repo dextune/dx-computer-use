@@ -1,0 +1,69 @@
+{
+  "case_id": "github-explore-retry",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 13,
+  "final_frame_id": "sandbox-shopping-1787389436351737990",
+  "attempts": 0,
+  "max_attempts": 5,
+  "action_count": 14,
+  "model_call_count": 1,
+  "model_error_count": 0,
+  "model_tokens": 702,
+  "compile_call_count": 1,
+  "grounding_call_count": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=10', ok=True)",
+    "ActionRecord(kind='focus', detail='linux at DuckDuckGo - Chromium', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=11', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=12', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=13', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='evidence_detail', detail='after_navigate scene=13 frame=sandbox-shopping-1787389436351737990 elements=ocr_line_1,ocr_line_2', ok=True)",
+    "ActionRecord(kind='evidence', detail='after_navigate', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=7, purpose='plan_compile', model='MiniMax-M3', prompt_length=818, provider='minimax', response_tokens=702, latency_ms=3491, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "evidence_scene_version": 13,
+  "evidence_frame_id": "sandbox-shopping-1787389436351737990",
+  "evidence_tokens": [
+    "Explore",
+    "GitHub",
+    "Trending repositories",
+    "Trending developers",
+    "topics",
+    "Featured",
+    "Explore GitHub"
+  ],
+  "evidence_element_ids": [
+    "ocr_line_1",
+    "ocr_line_2"
+  ],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 8688,
+  "attempts_detail": [],
+  "artifact_manifest": [
+    "artifacts/retries/failed-cases-loop-14/github-explore-retry-evidence.png",
+    "artifacts/retries/failed-cases-loop-14/github-explore-retry.json"
+  ],
+  "decision_diagnostics": []
+}

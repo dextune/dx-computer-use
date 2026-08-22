@@ -47,6 +47,15 @@ class FailureCode(str, Enum):
     MODEL_TIMEOUT = "model_timeout"
     MODEL_SCHEMA_INVALID = "model_schema_invalid"
     MODEL_RESPONSE_INVALID = "model_response_invalid"
+    MODEL_FAILED = "model_failed"
+    DECISION_REQUIRED = "decision_required"
+
+    # --- challenge / human handoff ---
+    CAPTCHA_DETECTED = "captcha_detected"
+    LOGIN_REQUIRED = "login_required"
+    SECURITY_CHECK_REQUIRED = "security_check_required"
+    HUMAN_HANDOFF_REQUIRED = "human_handoff_required"
+    ACCESS_CONTROL_BLOCKED = "access_control_blocked"
 
     # --- loop / recovery ---
     LOOP_DETECTED = "loop_detected"

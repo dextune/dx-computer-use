@@ -1,4 +1,4 @@
-"""Targeting compiler — goal → TargetingPack, MiniMax-M3 or fallback."""
+"""Targeting compiler — goal → TargetingPack, configured provider or fallback."""
 
 from hpcu.compiler.targeting_compiler import GoalFallbackTokenizer, TargetingCompiler
 

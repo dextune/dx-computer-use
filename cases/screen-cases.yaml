@@ -1,0 +1,16 @@
+cases:
+  - id: screen-terminal-opencode-coding
+    surface: terminal
+    goal: "OpenCode에서 격리된 fixture에 작은 코딩 작업을 수행해줘"
+    entry:
+      kind: terminal_command
+      value: "opencode"
+    max_attempts: 4
+    max_model_calls: 4
+  - id: screen-challenge-human-handoff
+    surface: challenge
+    goal: "접근 제어 화면을 안전하게 관찰하고 사람에게 넘겨줘"
+    entry:
+      kind: existing_screen
+    max_attempts: 1
+    max_model_calls: 2

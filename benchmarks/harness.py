@@ -103,13 +103,14 @@ def capture_dataset(
     stats_list: list[dict[str, Any]],
     output_path: Path,
     *,
-    model: str = "MiniMax-M3",
+    provider: str = "",
+    model: str = "",
 ) -> None:
     """Write a run-dataset.json from a list of per-case stat dicts.
 
-    Each dict must contain: case_id, success, actions, minimax_call_count,
-    minimax_error_count, minimax_tokens, model, compile_call_count,
-    grounding_call_count, failure.
+    Each dict should contain provider-neutral case outcome and evidence fields.
+    Missing optional fields are represented by safe defaults rather than being
+    inferred as success.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cases = []
@@ -117,26 +118,49 @@ def capture_dataset(
         cases.append({
             "case_id": str(stats.get("case_id", "unknown")),
             "success": bool(stats.get("success", False)),
+            "runner_success": bool(stats.get("runner_success", False)),
+            "verified_success": bool(stats.get("verified_success", False)),
             "actions": stats.get("actions", []),
-            "minimax_call_count": int(stats.get("minimax_call_count", 0)),
-            "minimax_error_count": int(stats.get("minimax_error_count", 0)),
-            "minimax_tokens": int(stats.get("minimax_tokens", 0)),
+            "attempts": int(stats.get("attempts", 0)),
+            "max_attempts": int(stats.get("max_attempts", 0)),
+            "elapsed_ms": int(stats.get("elapsed_ms", 0)),
+            "final_scene_version": int(stats.get("final_scene_version", 0)),
+            "final_frame_id": str(stats.get("final_frame_id", "")),
+            "evidence_scene_version": int(stats.get("evidence_scene_version", 0)),
+            "evidence_frame_id": str(stats.get("evidence_frame_id", "")),
+            "evidence_tokens": stats.get("evidence_tokens", []),
+            "evidence_element_ids": stats.get("evidence_element_ids", []),
+            "decision_diagnostics": stats.get("decision_diagnostics", []),
+            "attempts_detail": stats.get("attempts_detail", []),
+            "outcome": str(stats.get("outcome", "")),
+            "evidence_status": str(stats.get("evidence_status", "not_evaluated")),
+            "provider": str(stats.get("provider", provider)),
+            "model_call_count": int(stats.get("model_call_count", 0)),
+            "model_error_count": int(stats.get("model_error_count", 0)),
+            "model_tokens": int(stats.get("model_tokens", 0)),
             "model": str(stats.get("model", model)),
             "compile_call_count": int(stats.get("compile_call_count", 0)),
             "grounding_call_count": int(stats.get("grounding_call_count", 0)),
+            "failure_code": str(stats.get("failure_code", "")),
             "failure": str(stats.get("failure", "")),
+            "artifact_manifest": stats.get("artifact_manifest", []),
         })
     totals = {
         "cases": len(cases),
         "successes": sum(1 for c in cases if c["success"]),
         "action_count": sum(len(c["actions"]) for c in cases),
-        "minimax_call_count": sum(c["minimax_call_count"] for c in cases),
-        "minimax_error_count": sum(c["minimax_error_count"] for c in cases),
-        "minimax_tokens": sum(c["minimax_tokens"] for c in cases),
+        "model_call_count": sum(c["model_call_count"] for c in cases),
+        "model_error_count": sum(c["model_error_count"] for c in cases),
+        "model_tokens": sum(c["model_tokens"] for c in cases),
         "compile_call_count": sum(c["compile_call_count"] for c in cases),
         "grounding_call_count": sum(c["grounding_call_count"] for c in cases),
     }
-    payload = {"model": model, "cases": cases, "totals": totals}
+    payload = {
+        "provider": provider,
+        "model": model,
+        "cases": cases,
+        "totals": totals,
+    }
     output_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )

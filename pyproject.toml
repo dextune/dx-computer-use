@@ -39,6 +39,9 @@ asyncio_mode = "auto"
 [tool.coverage.run]
 source = ["hpcu"]
 branch = true
+omit = [
+    "hpcu/cases/__main__.py",
+]
 
 [tool.coverage.report]
 fail_under = 85

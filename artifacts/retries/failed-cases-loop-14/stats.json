@@ -1,0 +1,735 @@
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "cases": [
+    {
+      "case_id": "google-search-notebook-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 4,
+      "final_frame_id": "",
+      "attempts": 1,
+      "max_attempts": 5,
+      "action_count": 17,
+      "model_call_count": 3,
+      "model_error_count": 0,
+      "model_tokens": 2719,
+      "compile_call_count": 1,
+      "grounding_call_count": 2,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "Google laptop notebook under 2000000 KRW x BLA <<",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=1",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=2",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=3",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "Google laptop notebook under 2000000 KRW x BLA <<",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "post_click v=4",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "post_click",
+          "ok": true
+        },
+        {
+          "kind": "reanalysis",
+          "detail": "post_action_reanalysis",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "post_action scene=4 frame=sandbox-shopping-1787389403936088502 elements=x11:14680068,ocr_line_0,ocr_line_1,ocr_line_2,ocr_line_3,ocr_line_4,ocr_line_5,ocr_line_8",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 1,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 848,
+          "provider": "minimax",
+          "response_tokens": 924,
+          "latency_ms": 11100,
+          "error": ""
+        },
+        {
+          "call_number": 2,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1062,
+          "provider": "minimax",
+          "response_tokens": 826,
+          "latency_ms": 4884,
+          "error": ""
+        },
+        {
+          "call_number": 3,
+          "purpose": "post_action_reanalysis",
+          "model": "MiniMax-M3",
+          "prompt_length": 1355,
+          "provider": "minimax",
+          "response_tokens": 969,
+          "latency_ms": 3005,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 4,
+      "evidence_frame_id": "sandbox-shopping-1787389403936088502",
+      "evidence_tokens": [
+        "노트북",
+        "laptop",
+        "notebook",
+        "검색결과"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_0",
+        "ocr_line_1",
+        "ocr_line_2",
+        "ocr_line_3",
+        "ocr_line_4",
+        "ocr_line_5",
+        "ocr_line_8"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 1,
+      "elapsed_ms": 24339,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 3,
+          "selected_target": "ocr_line_0",
+          "action_ok": true,
+          "post_scene_version": 4,
+          "reanalysis_ok": true,
+          "verification_satisfied": true,
+          "model_call_start": 1,
+          "model_call_end": 3,
+          "failure": ""
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-14/google-search-notebook-retry-evidence.png",
+        "artifacts/retries/failed-cases-loop-14/google-search-notebook-retry.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "bbc-news-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 6,
+      "final_frame_id": "sandbox-shopping-1787389412104177239",
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 12,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 650,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=5",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "laptop notebook under 2000000 KRW - Google 검색 - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=6",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=6 frame=sandbox-shopping-1787389412104177239 elements=x11:14680068,ocr_line_1,ocr_line_2",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 4,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 650,
+          "latency_ms": 1500,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 6,
+      "evidence_frame_id": "sandbox-shopping-1787389412104177239",
+      "evidence_tokens": [
+        "BBC",
+        "News",
+        "Top stories"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_1",
+        "ocr_line_2"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 4775,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-14/bbc-news-retry-evidence.png",
+        "artifacts/retries/failed-cases-loop-14/bbc-news-retry.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "duckduckgo-linux-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 9,
+      "final_frame_id": "sandbox-shopping-1787389421168536100",
+      "attempts": 1,
+      "max_attempts": 5,
+      "action_count": 13,
+      "model_call_count": 2,
+      "model_error_count": 0,
+      "model_tokens": 1733,
+      "compile_call_count": 1,
+      "grounding_call_count": 1,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=7",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "BBC News - Breaking news, video and the latest top stories from the U.S. and aro",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=8",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=9",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "decision",
+          "detail": "goal_already_satisfied",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 5,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 824,
+          "provider": "minimax",
+          "response_tokens": 716,
+          "latency_ms": 4717,
+          "error": ""
+        },
+        {
+          "call_number": 6,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 2194,
+          "provider": "minimax",
+          "response_tokens": 1017,
+          "latency_ms": 6548,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 9,
+      "evidence_frame_id": "sandbox-shopping-1787389421168536100",
+      "evidence_tokens": [
+        "linux",
+        "Wikipedia",
+        "kernel"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_0",
+        "ocr_line_6",
+        "ocr_line_8",
+        "ocr_line_12",
+        "ocr_line_14",
+        "ocr_line_16"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 15882,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 9,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 5,
+          "model_call_end": 0,
+          "failure": ""
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-14/duckduckgo-linux-retry-evidence.png",
+        "artifacts/retries/failed-cases-loop-14/duckduckgo-linux-retry.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "github-explore-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 13,
+      "final_frame_id": "sandbox-shopping-1787389436351737990",
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 14,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 702,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=10",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "linux at DuckDuckGo - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=11",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=12",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=13",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=13 frame=sandbox-shopping-1787389436351737990 elements=ocr_line_1,ocr_line_2",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 7,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 702,
+          "latency_ms": 3491,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 13,
+      "evidence_frame_id": "sandbox-shopping-1787389436351737990",
+      "evidence_tokens": [
+        "Explore",
+        "GitHub",
+        "Trending repositories",
+        "Trending developers",
+        "topics",
+        "Featured",
+        "Explore GitHub"
+      ],
+      "evidence_element_ids": [
+        "ocr_line_1",
+        "ocr_line_2"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 8688,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-14/github-explore-retry-evidence.png",
+        "artifacts/retries/failed-cases-loop-14/github-explore-retry.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "wikipedia-python-retry",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 15,
+      "final_frame_id": "sandbox-shopping-1787389456561109613",
+      "attempts": 0,
+      "max_attempts": 5,
+      "action_count": 12,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 696,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=14",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "New Tab - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=15",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=15 frame=sandbox-shopping-1787389456561109613 elements=x11:14680068",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 8,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 856,
+          "provider": "minimax",
+          "response_tokens": 696,
+          "latency_ms": 16593,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 15,
+      "evidence_frame_id": "sandbox-shopping-1787389456561109613",
+      "evidence_tokens": [
+        "Python",
+        "programming language",
+        "Guido van Rossum"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 20211,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/retries/failed-cases-loop-14/wikipedia-python-retry-evidence.png",
+        "artifacts/retries/failed-cases-loop-14/wikipedia-python-retry.json"
+      ],
+      "decision_diagnostics": []
+    }
+  ],
+  "totals": {
+    "cases": 5,
+    "successes": 5,
+    "action_count": 68,
+    "model_call_count": 8,
+    "model_error_count": 0,
+    "model_tokens": 6500,
+    "compile_call_count": 5,
+    "grounding_call_count": 3,
+    "purpose_call_counts": {
+      "plan_compile": 5,
+      "situation_analysis": 0,
+      "action_decision": 2,
+      "post_action_reanalysis": 1,
+      "recovery_reanalysis": 0
+    }
+  }
+}

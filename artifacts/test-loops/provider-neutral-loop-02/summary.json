@@ -1,0 +1,1 @@
+{"loop":2,"command":"pytest -q --strict-markers -m not e2e","exit_code":0,"result":"passed"}

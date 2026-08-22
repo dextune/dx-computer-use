@@ -36,7 +36,7 @@ class RemoteVncInjector(InputInjector):
             failure_code="input_semantic_unsupported",
         )
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
+    async def physical(self, point: ScreenPoint, action: str, text: str | None = None) -> ExecutionResult:
         return ExecutionResult(
             success=False, mode="physical",
             failure_code="input_physical_unsupported",

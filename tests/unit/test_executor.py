@@ -27,7 +27,7 @@ class FakeInputInjector(InputInjector):
         super().__init__("test-session")
         self._semantic_success = semantic_success
         self.semantic_calls: list[tuple[str, str]] = []
-        self.physical_calls: list[tuple[float, float, str]] = []
+        self.physical_calls: list[tuple[float, float, str, str | None]] = []
 
     async def semantic(self, element: UIElement, action: str) -> ExecutionResult:
         self.semantic_calls.append((element.id, action))
@@ -39,8 +39,10 @@ class FakeInputInjector(InputInjector):
             failure_code=FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value,
         )
 
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
-        self.physical_calls.append((point.x, point.y, action))
+    async def physical(
+        self, point: ScreenPoint, action: str, text: str | None = None
+    ) -> ExecutionResult:
+        self.physical_calls.append((point.x, point.y, action, text))
         return ExecutionResult(success=True, mode="physical")
 
     def capabilities(self) -> InputCapabilities:
@@ -148,7 +150,7 @@ async def test_execute_falls_back_to_physical_when_semantic_fails():
     assert len(injector.semantic_calls) == 1
     assert result.success is True
     assert result.mode == "physical"
-    assert injector.physical_calls == [(100.0, 200.0, "click")]
+    assert injector.physical_calls == [(100.0, 200.0, "click", None)]
 
 
 @pytest.mark.unit
@@ -167,7 +169,7 @@ async def test_execute_uses_physical_when_only_point_present():
     assert result.success is True
     assert result.mode == "physical"
     assert injector.semantic_calls == []
-    assert injector.physical_calls == [(100.0, 200.0, "click")]
+    assert injector.physical_calls == [(100.0, 200.0, "click", None)]
 
 
 @pytest.mark.unit
@@ -264,6 +266,16 @@ async def test_wait_until_yields_to_event_loop():
     await wait_task
     await sibling_task
     assert sibling_done["done"] is True
+
+
+@pytest.mark.unit
+async def test_inject_physical_type_passes_text():
+    injector = FakeInputInjector()
+    executor = Executor(injector)
+    result = await executor.inject_physical(make_point(), "type", text="https://example.com")
+    assert result.success is True
+    assert injector.physical_calls == [(100.0, 200.0, "type", "https://example.com")]
+    assert injector.semantic_calls == []
 
 
 @pytest.mark.unit

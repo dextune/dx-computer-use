@@ -1,0 +1,6 @@
+{
+  "prompt": "You help a computer-use agent navigate a web page. Return JSON only.\nStart URL: https://duckduckgo.com/?q=linux\nGoal: DuckDuckGo에서 linux를 검색해줘\n\nPredict short tokens (1-4 words each) that will appear on screen:\n- ready_any: tokens that signal the page has loaded\n- success_any: tokens that signal the goal is achieved (empty = same as ready_any)\n- forbid_any: tokens that signal a wrong page or failure\n- pick_query: the best search phrase to find the click target\n- pick_required: true if the user must click something\n- dismiss_any: tokens for consent/close/overlay buttons\n- blocked_any: tokens for anti-bot/blocked/captcha pages\n- ignore_any: tokens to skip when picking\n\nReturn JSON: {\"ready_any\":[],\"success_any\":[],\"forbid_any\":[],\"pick_query\":\"\",\"pick_required\":true,\"dismiss_any\":[],\"blocked_any\":[],\"ignore_any\":[]}",
+  "content": "\n\n{\"ready_any\":[\"DuckDuckGo\",\"Search\",\"linux\"],\"success_any\":[\"Linux\",\"kernel.org\",\"Wikipedia\"],\"forbid_any\":[\"404\",\"error\",\"not found\",\"captcha\"],\"pick_query\":\"Search\",\"pick_required\":true,\"dismiss_any\":[\"Accept\",\"Agree\",\"Got it\",\"cookie\"],\"blocked_any\":[\"captcha\",\"robot\",\"are you human\",\"unusual traffic\"],\"ignore_any\":[\"Privacy\",\"Settings\",\"About\",\"Advertising\"]}",
+  "model": "MiniMax-M3",
+  "provider": "minimax"
+}

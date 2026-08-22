@@ -4,7 +4,7 @@ A TargetingPack is the ONLY source of site/CTA/consent tokens that the
 common runtime uses.  No site enum, no regex fields, no click coordinates.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class TargetingPack:
     """
 
     goal_id: str
-    source: str = "goal_tokens"  # "minimax" | "goal_tokens"
+    source: str = "goal_tokens"  # "semantic_model" | "goal_tokens"
     ready_any: tuple[str, ...] = ()
     success_any: tuple[str, ...] = ()
     forbid_any: tuple[str, ...] = ()
@@ -30,7 +30,8 @@ class TargetingPack:
     def __post_init__(self) -> None:
         if not self.goal_id:
             raise ValueError("TargetingPack.goal_id must be non-empty")
-        if self.source not in ("minimax", "goal_tokens"):
+        if self.source not in ("model", "goal_tokens"):
             raise ValueError(
-                f"TargetingPack.source must be 'minimax' or 'goal_tokens', got {self.source!r}"
+                "TargetingPack.source must be a recognized provenance, "
+                f"got {self.source!r}"
             )

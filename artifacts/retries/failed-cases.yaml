@@ -1,0 +1,26 @@
+cases:
+  - id: google-search-notebook-retry
+    goal: "구글에서 노트북을 검색해줘"
+    start_url: "https://www.google.com/search?q=laptop+notebook+under+2000000+KRW"
+    max_attempts: 5
+    max_model_calls: 2
+  - id: bbc-news-retry
+    goal: "BBC 뉴스 메인 페이지를 열어줘"
+    start_url: "https://www.bbc.com/news"
+    max_attempts: 5
+    max_model_calls: 2
+  - id: duckduckgo-linux-retry
+    goal: "DuckDuckGo에서 linux를 검색해줘"
+    start_url: "https://duckduckgo.com/?q=linux"
+    max_attempts: 5
+    max_model_calls: 2
+  - id: github-explore-retry
+    goal: "GitHub Explore 페이지를 열어줘"
+    start_url: "https://github.com/explore"
+    max_attempts: 5
+    max_model_calls: 2
+  - id: wikipedia-python-retry
+    goal: "위키피디아에서 Python 프로그래밍 문서를 열어줘"
+    start_url: "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    max_attempts: 5
+    max_model_calls: 2

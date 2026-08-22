@@ -63,16 +63,15 @@ class InputInjector(ABC):
         ...
 
     @abstractmethod
-    async def physical(self, point: ScreenPoint, action: str) -> ExecutionResult:
+    async def physical(
+        self,
+        point: ScreenPoint,
+        action: str,
+        text: str | None = None,
+    ) -> ExecutionResult:
         """Perform a physical input action (click, key, type) at a point.
 
-        Args:
-            point: The screen point in physical coordinates.
-            action: The action to perform ("click", "dblclick", "rclick",
-                    "type", "key", "scroll").
-
-        Returns:
-            ExecutionResult with success=True if the input was injected.
+        `text` is used for type/hotkey. Adapters ignore it for pointer clicks.
         """
         ...
 

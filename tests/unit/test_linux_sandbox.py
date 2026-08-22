@@ -5,8 +5,8 @@ import struct
 
 import pytest
 
+from hpcu.capture.frame_store import FrameStore
 from hpcu.platform.linux.sandbox import (
-    FrameStore,
     GrokSandboxCapture,
     GrokSandboxInjector,
     GrokSandboxStructure,
@@ -132,6 +132,60 @@ async def test_injector_physical_click_runs_xdotool():
     exec_posts = [item for item in http.posts if item[1] and item[1].get("cmd") == "xdotool"]
     assert exec_posts
     assert exec_posts[0][1]["args"] == ["mousemove", "100", "200", "click", "1"]
+
+
+@pytest.mark.unit
+async def test_injector_physical_type_sends_text():
+    http = FakeHttp()
+    injector = GrokSandboxInjector(
+        "sess", client=SandboxHttpClient("http://sandbox.test", http=http)
+    )
+    point = ScreenPoint(space=CoordinateSpace.SCREEN_PHYSICAL_PX, x=1, y=1)
+    result = await injector.physical(point, "type", text="https://example.com")
+    assert result.success is True
+    exec_posts = [item for item in http.posts if item[1] and item[1].get("cmd") == "xdotool"]
+    assert exec_posts[0][1]["args"] == [
+        "type",
+        "--delay",
+        "0",
+        "--clearmodifiers",
+        "--",
+        "https://example.com",
+    ]
+
+
+@pytest.mark.unit
+async def test_injector_physical_key_maps_enter():
+    http = FakeHttp()
+    injector = GrokSandboxInjector(
+        "sess", client=SandboxHttpClient("http://sandbox.test", http=http)
+    )
+    point = ScreenPoint(space=CoordinateSpace.SCREEN_PHYSICAL_PX, x=1, y=1)
+    result = await injector.physical(point, "key", text="Enter")
+    assert result.success is True
+    exec_posts = [item for item in http.posts if item[1] and item[1].get("cmd") == "xdotool"]
+    assert exec_posts[0][1]["args"] == ["key", "Return"]
+
+
+@pytest.mark.unit
+async def test_injector_semantic_focuses_window_ref():
+    http = FakeHttp()
+    injector = GrokSandboxInjector(
+        "sess", client=SandboxHttpClient("http://sandbox.test", http=http)
+    )
+    from hpcu.schemas.ui_element import ElementSource
+
+    element = UIElement(
+        id="x11:42",
+        scene_version=1,
+        role="window",
+        sources=(ElementSource(type="atspi", ref="42"),),
+    )
+    result = await injector.semantic(element, "focus")
+    assert result.success is True
+    assert result.mode == "semantic"
+    exec_posts = [item for item in http.posts if item[1] and item[1].get("cmd") == "xdotool"]
+    assert exec_posts[0][1]["args"] == ["windowactivate", "42"]
 
 
 @pytest.mark.unit

@@ -29,6 +29,7 @@ language: "ko-KR"
 | `11-quality-benchmark.md` | 평가·벤치마크·성능 SLO·개발 도구 | §20.5, §26~27 |
 | `12-roadmap-phases.md` | 개발 로드맵 (Phase 0~8) | §25, §32 |
 | `13-common-pipeline-remediation.md` | 공통 파이프라인 개선 (루프·delta·Grounder) | 코드–문서 검수 |
+| `14-goal-compiled-targeting.md` | 목표 편찬 Targeting Pack | 목표마다 MiniMax가 어휘 팩 편찬 |
 
 진행 관리는 `docs/plan/tasklist.md`에서 체크박스 방식으로 수행한다.
 
@@ -50,6 +51,7 @@ language: "ko-KR"
 | 테스트·마커 | `docs/rules/testing-standards.md` | 03은 관찰 테스트만 링크 |
 | 할 일 | `docs/plan/tasklist.md` | 설계를 여기서 바꾸지 않음 |
 | 공통 파이프 부채 해소 순서 | `13-common-pipeline-remediation.md` | 스펙은 01·03·06·07. 여기엔 순서만 |
+| 목표 편찬 TargetingPack·matcher | `docs/plan/14-goal-compiled-targeting.md` | 06/08에 토큰 목록 복제 금지 |
 | 원안(역사) | `docs/dev-init-001.md` | 새 결정의 집이 아님. plan이 생긴 주제는 plan을 고친다 |
 
 `dev-init-001.md`는 기획 원안이다. 구현 계약이 바뀌면 **plan을 고치고**,

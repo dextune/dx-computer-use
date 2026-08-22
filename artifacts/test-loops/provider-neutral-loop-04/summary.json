@@ -1,0 +1,18 @@
+{
+  "loop": 4,
+  "command": "pytest -q --strict-markers -m 'not e2e'",
+  "exit_code": 0,
+  "result": "passed",
+  "pytest_output": "pytest.txt",
+  "attempt_policy": {
+    "max_case_attempts": 5,
+    "failed_case_action": "preserve evidence and stop after five attempts"
+  },
+  "changes_verified": [
+    "configuration-driven gateway registry",
+    "strict evidence success",
+    "provider-neutral stats",
+    "bounded attempt metadata"
+  ],
+  "focused_static_check": "ruff passed on changed provider/case/evidence/benchmark files"
+}

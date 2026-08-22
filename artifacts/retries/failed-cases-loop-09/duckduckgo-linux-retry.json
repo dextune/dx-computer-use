@@ -1,0 +1,55 @@
+{
+  "case_id": "duckduckgo-linux-retry",
+  "success": false,
+  "runner_success": false,
+  "verified_success": false,
+  "human_confirmed": false,
+  "outcome": "model_failed",
+  "failure_code": "model_schema_invalid",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 13,
+  "attempts": 1,
+  "max_attempts": 5,
+  "action_count": 15,
+  "model_call_count": 2,
+  "model_error_count": 0,
+  "model_tokens": 1309,
+  "compile_call_count": 1,
+  "grounding_call_count": 1,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "model_schema_invalid",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=10', ok=True)",
+    "ActionRecord(kind='focus', detail='Desktop', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=11', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='capture', detail='attempt-1 v=12', ok=True)",
+    "ActionRecord(kind='click', detail='(6 linux Q Protection. Privacy. Peace of mind. =', ok=True)",
+    "ActionRecord(kind='capture', detail='post_click v=13', ok=True)",
+    "ActionRecord(kind='settle', detail='post_click', ok=True)",
+    "ActionRecord(kind='reanalysis', detail='strict_reanalysis_rejected', ok=False)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=8, purpose='plan_compile', model='MiniMax-M3', prompt_length=824, provider='minimax', response_tokens=682, latency_ms=5046, error='')",
+    "AiCallRecord(call_number=9, purpose='post_action_reanalysis', model='MiniMax-M3', prompt_length=896, provider='minimax', response_tokens=627, latency_ms=2935, error='')"
+  ],
+  "evidence_status": "not_evaluated",
+  "stale_rejection_count": 1,
+  "reanalysis_count": 0,
+  "elapsed_ms": 13539,
+  "attempts_detail": [
+    "AttemptRecord(attempt=1, scene_version_start=12, selected_target='ocr_line_0', action_ok=True, post_scene_version=13, reanalysis_ok=False, verification_satisfied=False, model_call_start=8, model_call_end=9, failure='model_schema_invalid')"
+  ],
+  "artifact_manifest": [
+    "artifacts/retries/failed-cases-loop-09/duckduckgo-linux-retry.json"
+  ]
+}

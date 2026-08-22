@@ -15,7 +15,7 @@ class StubInjector:
     async def semantic(self, element, action):
         return None
 
-    async def physical(self, point, action):
+    async def physical(self, point, action, text=None):
         return None
 
     def capabilities(self):

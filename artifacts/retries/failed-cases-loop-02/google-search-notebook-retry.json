@@ -1,0 +1,33 @@
+{
+  "case_id": "google-search-notebook-retry",
+  "success": false,
+  "runner_success": false,
+  "verified_success": false,
+  "human_confirmed": false,
+  "outcome": "model_failed",
+  "failure_code": "model_failed",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 0,
+  "attempts": 0,
+  "max_attempts": 5,
+  "action_count": 0,
+  "model_call_count": 1,
+  "model_error_count": 0,
+  "model_tokens": 904,
+  "compile_call_count": 1,
+  "grounding_call_count": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "model_failed",
+  "actions": [],
+  "ai_calls": [
+    "AiCallRecord(call_number=1, purpose='plan_compile', model='MiniMax-M3', prompt_length=848, provider='minimax', response_tokens=904, latency_ms=3100, error='')"
+  ],
+  "evidence_status": "not_evaluated",
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 3100,
+  "attempts_detail": []
+}

@@ -8,10 +8,13 @@ from dataclasses import replace
 from typing import Optional
 
 from hpcu.capture.backend import CaptureBackend
+from hpcu.capture.frame_store import FrameStore
 from hpcu.observation.base import Observer
 from hpcu.observation.structure_observer import StructureObserver
+from hpcu.perception.engine import ScreenPerception
+from hpcu.perception.window_chrome import content_roi, primary_window
 from hpcu.scene_graph.tracker import ElementTracker
-from hpcu.schemas.scene import FrameHandle, SceneDelta
+from hpcu.schemas.scene import FrameHandle, Scene, SceneDelta
 from hpcu.schemas.ui_element import UIElement
 
 
@@ -24,12 +27,16 @@ class CompositeObserver(Observer):
         capture_backend: Optional[CaptureBackend] = None,
         structure_observer: Optional[StructureObserver] = None,
         tracker: Optional[ElementTracker] = None,
+        perception: Optional[ScreenPerception] = None,
     ):
         super().__init__(session_id)
         self._validate_backend_session(capture_backend, "capture")
         self._validate_backend_session(structure_observer, "structure")
         self._capture_backend = capture_backend
         self._structure_observer = structure_observer
+        self._perception = perception if perception is not None else _auto_perception(
+            capture_backend
+        )
         self._tracker = tracker if tracker is not None else ElementTracker()
         self._version = 0
         self._capture_started = False
@@ -46,6 +53,17 @@ class CompositeObserver(Observer):
     async def observe(self) -> SceneDelta:
         frame = await self._grab_frame()
         current = await self._read_structure()
+        if self._perception is not None and frame is not None:
+            roi = content_roi(primary_window(Scene(version=0, elements=current)))
+            perceived = self._perception.elements_from_frame(
+                frame, self._version + 1, roi=roi
+            )
+            if not perceived and roi is not None:
+                perceived = self._perception.elements_from_frame(
+                    frame, self._version + 1, roi=None
+                )
+            for element in perceived:
+                current[element.id] = element
         remapped = self._remap_ids(current)
         base_version = self._version
         self._version += 1
@@ -108,3 +126,19 @@ class CompositeObserver(Observer):
                 f"CompositeObserver session mismatch: {label} backend is bound to "
                 f"{backend_session!r}, observer to {self._session_id!r}"
             )
+
+
+def _auto_perception(
+    capture_backend: Optional[CaptureBackend],
+) -> Optional[ScreenPerception]:
+    """Wire OCR when the capture backend already owns a FrameStore.
+
+    Other environments get perception for free: put PNG bytes in the
+    store; this facade never needs an OS-specific OCR path.
+    """
+    if capture_backend is None:
+        return None
+    store = getattr(capture_backend, "store", None)
+    if not isinstance(store, FrameStore):
+        return None
+    return ScreenPerception(store)

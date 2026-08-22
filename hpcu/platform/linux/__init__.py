@@ -9,7 +9,6 @@ from hpcu.platform.linux.backend import (
     probe as probe_native,
 )
 from hpcu.platform.linux.sandbox import (
-    FrameStore,
     GrokSandboxCapture,
     GrokSandboxInjector,
     GrokSandboxStructure,
@@ -18,7 +17,6 @@ from hpcu.platform.linux.sandbox import (
 )
 
 __all__ = [
-    "FrameStore",
     "GrokSandboxCapture",
     "GrokSandboxInjector",
     "GrokSandboxStructure",

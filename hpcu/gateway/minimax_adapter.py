@@ -15,7 +15,9 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from hpcu.gateway.gateway import Gateway, GatewayResponse
+from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
+
+_PROVIDER_ID = "minimax"
 
 _THINK_START = " thinking"
 _THINK_END = " response"
@@ -24,14 +26,33 @@ _DEFAULT_MODEL = "MiniMax-M3"
 
 
 def strip_thinking(content: str) -> str:
-    """Strip ` thinking...` reasoning blocks from model content.
+    """Normalize MiniMax reasoning and JSON presentation wrappers.
 
-    The MiniMax M3 model embeds its reasoning inside `message.content` as
-    `` thinking`` ... `` response``.  Everything between (and including)
-    those markers is removed.  An in-progress block (no closing marker) is
-    dropped entirely; a lone `` response`` with no preceding `` thinking`` is
-    treated as ordinary text and preserved.
+    MiniMax responses may contain legacy `` thinking``/`` response`` blocks,
+    XML-style ``<think>`` blocks, or a fenced JSON object. These are transport
+    quirks of this concrete adapter; the common decision parser still receives
+    one strict JSON object and rejects anything else.
     """
+    import re
+
+    content = re.sub(
+        r"<think(?:ing)?\b[^>]*>.*?</think(?:ing)?>",
+        "",
+        content,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    content = re.sub(
+        r"^\s*```(?:json)?\s*|\s*```\s*$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
+    # Some MiniMax responses omit the legacy `` thinking`` marker but still
+    # prepend prose before the JSON object. This transport cleanup stays in
+    # the concrete adapter; the common parser remains schema-strict.
+    first_object = content.find("{")
+    if first_object > 0:
+        content = content[first_object:]
     output: list[str] = []
     position = 0
     state = "normal"
@@ -89,6 +110,7 @@ class MiniMaxAdapter(Gateway):
         base_url: str = _DEFAULT_BASE_URL,
         model: str = _DEFAULT_MODEL,
         client: Optional[object] = None,
+        timeout_s: float = 30.0,
     ):
         """Initialize the adapter.
 
@@ -99,23 +121,37 @@ class MiniMaxAdapter(Gateway):
         """
         if not api_key:
             raise ValueError("api_key must not be empty")
+        if model != _DEFAULT_MODEL:
+            raise ValueError(f"only {_DEFAULT_MODEL} is supported")
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
-        self._model = model
+        self._model = _DEFAULT_MODEL
         if client is not None:
             self._client = client
         else:
             import httpx
 
-            self._client = httpx.Client()
+            self._client = httpx.Client(timeout=timeout_s)
+
+    @property
+    def provider_id(self) -> str:
+        return _PROVIDER_ID
+
+    @property
+    def model_id(self) -> str:
+        return self._model
 
     def call(
         self,
         prompt: str,
         system_prompt: str = "",
         max_tokens: Optional[int] = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
     ) -> GatewayResponse:
-        """Invoke the model and return a thinking-stripped response."""
+        """Invoke MiniMax-M3 and return a thinking-stripped response."""
+        if not isinstance(purpose, ModelCallPurpose):
+            raise ValueError("purpose must be a ModelCallPurpose")
         import time
 
         messages = []
@@ -146,25 +182,36 @@ class MiniMaxAdapter(Gateway):
         content = strip_thinking(content)
         tokens_used = int(data.get("usage", {}).get("total_tokens", 0))
 
+        response_model = data.get("model", self._model)
+        if response_model != _DEFAULT_MODEL:
+            raise ValueError(f"unexpected model response: {response_model!r}")
         return GatewayResponse(
             content=content,
-            model=data.get("model", self._model),
+            model=response_model,
             tokens_used=tokens_used,
             latency_ms=latency_ms,
+            provider=_PROVIDER_ID,
         )
 
     @classmethod
     def from_env(
         cls,
         *,
+        model: str = _DEFAULT_MODEL,
         client: Optional[object] = None,
         env_path: Optional[Path] = None,
+        timeout_s: float = 30.0,
     ) -> "MiniMaxAdapter":
         """Build an adapter using MINIMAX_API_KEY from the environment or `.env`."""
         api_key = load_minimax_api_key(env_path=env_path)
         if not api_key:
             raise ValueError("MINIMAX_API_KEY is not set")
-        return cls(api_key=api_key, client=client)
+        return cls(
+            api_key=api_key,
+            model=model,
+            client=client,
+            timeout_s=timeout_s,
+        )
 
 
 def load_minimax_api_key(*, env_path: Optional[Path] = None) -> str:
@@ -172,7 +219,11 @@ def load_minimax_api_key(*, env_path: Optional[Path] = None) -> str:
     existing = os.environ.get("MINIMAX_API_KEY", "").strip()
     if existing:
         return existing
-    path = env_path if env_path is not None else Path(__file__).resolve().parents[2] / ".env"
+    path = (
+        env_path
+        if env_path is not None
+        else Path(__file__).resolve().parents[2] / ".env"
+    )
     if not path.is_file():
         return ""
     for line in path.read_text(encoding="utf-8").splitlines():

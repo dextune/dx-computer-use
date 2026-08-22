@@ -1,0 +1,48 @@
+{
+  "case_id": "google-search-notebook-retry",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 0,
+  "attempts": 0,
+  "max_attempts": 5,
+  "action_count": 11,
+  "model_call_count": 1,
+  "model_error_count": 0,
+  "model_tokens": 934,
+  "compile_call_count": 1,
+  "grounding_call_count": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=1', ok=True)",
+    "ActionRecord(kind='focus', detail='Desktop', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=2', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='evidence', detail='after_navigate', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=1, purpose='plan_compile', model='MiniMax-M3', prompt_length=848, provider='minimax', response_tokens=934, latency_ms=14226, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 17756,
+  "attempts_detail": [],
+  "artifact_manifest": [
+    "artifacts/retries/failed-cases-loop-08/google-search-notebook-retry.json"
+  ]
+}

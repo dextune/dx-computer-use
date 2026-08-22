@@ -1,0 +1,6 @@
+{
+  "prompt": "You are the sole semantic action decision-maker. Return exactly one JSON object with these keys: schema_version, scene_version, action, target_id, value, key, goal_state, confidence, reason_code, expected_postcondition. Use only a target id listed in Candidates. Current scene_version: 3\nGoal: DuckDuckGo에서 linux를 검색해줘\nCandidates:\nocr_line_0: (6 linux Q Protection. Privacy. Peace of mind. =\nocr_line_1: (으시 images @oduckai &\nocr_line_2: @ Protected» CB Korea~ Safe search: moderate» Any time ~\nocr_line_3: Share Feedback",
+  "content": "\n\n",
+  "model": "MiniMax-M3",
+  "provider": "minimax"
+}

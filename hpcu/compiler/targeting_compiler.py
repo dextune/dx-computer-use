@@ -1,7 +1,8 @@
-"""Goal → TargetingPack compiler.  MiniMax-M3 plan-time, fallback otherwise.
+"""Goal → TargetingPack compiler with a configured semantic provider.
 
-T1: GoalFallbackTokenizer — goal string only, no model, no hardcoded 사전.
-T2: TargetingCompiler — wraps CountingGateway, schema-validates, strips thinking.
+T1: GoalFallbackTokenizer — goal string only, no model, no hardcoded dictionary.
+T2: TargetingCompiler — wraps CountingGateway, validates schemas, and strips
+provider-specific reasoning.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import re
 from typing import Optional
 
 from hpcu.cases.stats import CountingGateway
+from hpcu.gateway.gateway import ModelCallPurpose
 from hpcu.runtime_config import load_runtime_config
 from hpcu.schemas.targeting import TargetingPack
 
@@ -64,11 +66,12 @@ class GoalFallbackTokenizer:
 
 
 class TargetingCompiler:
-    """Compile a user goal into a TargetingPack via MiniMax-M3.
+    """Compile a user goal into a TargetingPack via the configured provider.
 
-    Calls the model at plan-time (≤1 per task).  On any failure —
-    broken JSON, timeout, schema mismatch — falls back to
-    GoalFallbackTokenizer so the runner never halts.
+    Calls the model at plan-time (≤1 per task). On failure, returns a
+    goal-derived pack marked ``goal_tokens``; the action runner must reject
+    that pack when a configured gateway is present rather than silently
+    clicking from lexical fallback data.
     """
 
     _THINKING_STRIP = re.compile(r"<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE)
@@ -80,30 +83,52 @@ class TargetingCompiler:
         config: Optional[dict] = None,
     ):
         self._gateway = gateway
+        runtime = config if config is not None else load_runtime_config()
+        limits = runtime.get("semantic", {}).get("request_limits", {})
+        self._max_tokens = int(limits.get("plan_compile_max_tokens", 1024))
+        self._retry_attempts = max(
+            1, int(limits.get("plan_compile_retry_attempts", 2))
+        )
         self._fallback = GoalFallbackTokenizer(config=config)
 
     def compile(self, goal_id: str, goal: str, start_url: str = "") -> TargetingPack:
         if self._gateway is None:
             return self._fallback.tokenize(goal_id, goal)
-        try:
-            response = self._gateway.call(
-                prompt=_build_compile_prompt(goal, start_url),
-                system_prompt="JSON only.",
-                max_tokens=512,
-            )
-        except Exception:
-            return self._fallback.tokenize(goal_id, goal)
+        prompt = _build_compile_prompt(goal, start_url)
+        for _attempt in range(self._retry_attempts):
+            try:
+                response = self._gateway.call(
+                    prompt=prompt,
+                    system_prompt=(
+                        "JSON only. Return one compact JSON object and no markdown."
+                    ),
+                    max_tokens=self._max_tokens,
+                    purpose=ModelCallPurpose.PLAN_COMPILE,
+                )
+            except Exception:
+                continue
 
-        content = self._THINKING_STRIP.sub("", response.content).strip()
+            content = self._THINKING_STRIP.sub("", response.content).strip()
+            payload = _load_json_object(content)
+            if isinstance(payload, dict):
+                return _pack_from_json(goal_id, goal, payload, self._fallback)
+
+        return self._fallback.tokenize(goal_id, goal)
+
+
+def _load_json_object(content: str) -> dict | None:
+    """Load a JSON object from a provider response without semantic repair."""
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if match is None:
+            return None
         try:
-            payload = json.loads(content)
+            payload = json.loads(match.group(0))
         except json.JSONDecodeError:
-            return self._fallback.tokenize(goal_id, goal)
-
-        if not isinstance(payload, dict):
-            return self._fallback.tokenize(goal_id, goal)
-
-        return _pack_from_json(goal_id, payload, self._fallback)
+            return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _build_compile_prompt(goal: str, start_url: str) -> str:
@@ -115,7 +140,8 @@ def _build_compile_prompt(goal: str, start_url: str) -> str:
         f"Goal: {goal}\n\n"
         f"Predict short tokens (1-4 words each) that will appear on screen:\n"
         f"- ready_any: tokens that signal the page has loaded\n"
-        f"- success_any: tokens that signal the goal is achieved (empty = same as ready_any)\n"
+        f"- success_any: tokens that signal the goal is achieved "
+        f"(empty = same as ready_any)\n"
         f"- forbid_any: tokens that signal a wrong page or failure\n"
         f"- pick_query: the best search phrase to find the click target\n"
         f"- pick_required: true if the user must click something\n"
@@ -129,23 +155,29 @@ def _build_compile_prompt(goal: str, start_url: str) -> str:
 
 
 def _pack_from_json(
-    goal_id: str, payload: dict, fallback: GoalFallbackTokenizer
+    goal_id: str,
+    goal: str,
+    payload: dict,
+    fallback: GoalFallbackTokenizer,
 ) -> TargetingPack:
     try:
+        pick_required = payload.get("pick_required", True)
+        if not isinstance(pick_required, bool):
+            raise ValueError("pick_required must be boolean")
         return TargetingPack(
             goal_id=goal_id,
-            source="minimax",
+            source="model",
             ready_any=tuple(_list_field(payload, "ready_any")),
             success_any=tuple(_list_field(payload, "success_any")),
             forbid_any=tuple(_list_field(payload, "forbid_any")),
             pick_query=str(payload.get("pick_query", "")),
-            pick_required=bool(payload.get("pick_required", True)),
+            pick_required=pick_required,
             dismiss_any=tuple(_list_field(payload, "dismiss_any")),
             blocked_any=tuple(_list_field(payload, "blocked_any")),
             ignore_any=tuple(_list_field(payload, "ignore_any")),
         )
     except Exception:
-        return fallback.tokenize(goal_id, payload.get("goal_id", goal_id))
+        return fallback.tokenize(goal_id, goal)
 
 
 def _list_field(payload: dict, key: str) -> list[str]:

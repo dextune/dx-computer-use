@@ -11,6 +11,11 @@ from typing import Optional
 
 from hpcu.schemas.action import Postcondition, PostconditionKind
 from hpcu.schemas.evidence import EvidenceCondition, EvidenceContract, EvidenceKind
+from hpcu.schemas.evidence_state import (
+    EvidenceObservation,
+    EvidenceState,
+    EvidenceStatus,
+)
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
@@ -24,21 +29,43 @@ class Verifier:
     """
 
     def verify(self, contract: EvidenceContract, scene: Scene) -> bool:
-        """Return True when the contract is fully satisfied by the scene.
+        """Return True only when independent screen evidence is satisfied."""
+        return self.verify_state(contract, scene).satisfied
 
-        All conditions in `contract.all` must hold; otherwise any condition
-        in `contract.any` must hold.  An empty-conditions contract cannot be
-        constructed (the schema rejects it) and evaluates to False.
-        """
-        if contract.all:
-            return all(
-                self._check_evidence_condition(cond, scene) for cond in contract.all
+    def verify_state(self, contract: EvidenceContract, scene: Scene) -> EvidenceState:
+        """Return structured condition evidence without accepting model claims."""
+        conditions = contract.all or contract.any
+        if not conditions:
+            return EvidenceState(
+                scene_version=scene.version,
+                status=EvidenceStatus.UNSATISFIED,
             )
-        if contract.any:
-            return any(
-                self._check_evidence_condition(cond, scene) for cond in contract.any
+        observations = tuple(
+            EvidenceObservation(
+                condition_index=index,
+                status=(
+                    EvidenceStatus.SATISFIED
+                    if self._check_evidence_condition(condition, scene)
+                    else EvidenceStatus.UNSATISFIED
+                ),
+                scene_version=scene.version,
             )
-        return False
+            for index, condition in enumerate(conditions)
+        )
+        checks = [
+            observation.status is EvidenceStatus.SATISFIED
+            for observation in observations
+        ]
+        satisfied = all(checks) if contract.all else any(checks)
+        return EvidenceState(
+            scene_version=scene.version,
+            status=(
+                EvidenceStatus.SATISFIED
+                if satisfied
+                else EvidenceStatus.UNSATISFIED
+            ),
+            observations=observations,
+        )
 
     def verify_postconditions(
         self,
