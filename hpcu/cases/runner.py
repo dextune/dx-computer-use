@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 
 from hpcu.cases.specs import CaseSpec
-from hpcu.cases.stats import ActionRecord, CaseStats
+from hpcu.cases.stats import ActionRecord, CaseStats, EvidenceRecord
 from hpcu.runtime_core.product_runtime import (
     CommandRequest,
     CommandRuntime,
@@ -31,7 +32,7 @@ _REANALYSIS_PURPOSES = ("post_action_reanalysis", "recovery_reanalysis")
 
 
 class CaseRunner:
-    """Translate CaseSpec to CommandRequest and translate terminal statistics.
+    """Translate CaseSpec to CommandRequest and terminal runtime statistics.
 
     This adapter owns no gateway, parser, observer, executor, input injector,
     scene loop, or retry budget. All execution passes through CommandRuntime.
@@ -111,6 +112,19 @@ class CaseRunner:
         stats.evidence_scene_version = task.final_scene_version
         stats.evidence_frame_id = task.final_frame_id
         stats.evidence_element_ids = list(task.terminal_evidence_ids)
+        stats.evidence_bindings = [
+            self._evidence_record(binding) for binding in task.evidence_bindings
+        ]
+        stats.evidence_tokens = [
+            binding.requirement for binding in task.evidence_bindings
+        ]
+        if task.evidence_bindings:
+            latest = max(
+                task.evidence_bindings,
+                key=lambda binding: binding.scene_version,
+            )
+            stats.evidence_scene_version = latest.scene_version
+            stats.evidence_frame_id = latest.frame_id
 
         for node_id in task.completed_node_ids:
             node = result.plan.nodes[node_id]
@@ -134,6 +148,26 @@ class CaseRunner:
             )
         stats.elapsed_ms = int((self._monotonic() - started) * 1000)
         return stats
+
+    @staticmethod
+    def _evidence_record(binding) -> EvidenceRecord:
+        observed = binding.observed_text
+        return EvidenceRecord(
+            requirement=binding.requirement,
+            node_id=binding.node_id,
+            element_id=binding.element_id,
+            scene_version=binding.scene_version,
+            frame_id=binding.frame_id,
+            role=binding.role,
+            fingerprint=binding.fingerprint,
+            observed_text_sha256=hashlib.sha256(
+                observed.encode("utf-8")
+            ).hexdigest(),
+            observed_text_length=len(observed),
+            visible=binding.visible,
+            enabled=binding.enabled,
+            selected=binding.selected,
+        )
 
     @staticmethod
     def _fail_before_runtime(
