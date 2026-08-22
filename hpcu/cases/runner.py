@@ -6,7 +6,6 @@ import time
 
 from hpcu.cases.specs import CaseSpec
 from hpcu.cases.stats import ActionRecord, CaseStats
-from hpcu.gateway.gateway import ModelCallPurpose
 from hpcu.runtime_core.product_runtime import (
     CommandRequest,
     CommandRuntime,
@@ -26,6 +25,9 @@ _LOCAL_ONLY_OPS = frozenset(
         ActionOp.CHECKPOINT,
     }
 )
+_PLAN_COMPILE_PURPOSE = "plan_compile"
+_GROUNDING_PURPOSES = ("grounding", "action_decision")
+_REANALYSIS_PURPOSES = ("post_action_reanalysis", "recovery_reanalysis")
 
 
 class CaseRunner:
@@ -96,28 +98,16 @@ class CaseRunner:
         stats.attempts = task.steps
         stats.model_call_count = result.model_calls
         stats.model_tokens = result.model_tokens
-        stats.compile_call_count = purpose_counts.get(
-            ModelCallPurpose.PLAN_COMPILE.value, 0
-        )
+        stats.compile_call_count = purpose_counts.get(_PLAN_COMPILE_PURPOSE, 0)
         stats.grounding_call_count = sum(
-            purpose_counts.get(purpose.value, 0)
-            for purpose in (
-                ModelCallPurpose.GROUNDING,
-                ModelCallPurpose.ACTION_DECISION,
-            )
+            purpose_counts.get(purpose, 0) for purpose in _GROUNDING_PURPOSES
         )
         stats.reanalysis_count = sum(
-            purpose_counts.get(purpose.value, 0)
-            for purpose in (
-                ModelCallPurpose.POST_ACTION_REANALYSIS,
-                ModelCallPurpose.RECOVERY_REANALYSIS,
-            )
+            purpose_counts.get(purpose, 0) for purpose in _REANALYSIS_PURPOSES
         )
         stats.provider = result.provider_id or stats.provider
         stats.model = result.model_id or stats.model
-        stats.evidence_status = (
-            "satisfied" if task.success else "unsatisfied"
-        )
+        stats.evidence_status = "satisfied" if task.success else "unsatisfied"
         stats.evidence_scene_version = task.final_scene_version
         stats.evidence_frame_id = task.final_frame_id
         stats.evidence_element_ids = list(task.terminal_evidence_ids)
