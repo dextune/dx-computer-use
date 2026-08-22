@@ -160,7 +160,7 @@ def test_semantic_slot_filler_only_returns_unresolved_fields():
     assert ledger.model_calls == 1
 
 
-def test_semantic_slot_filler_rejects_protected_key():
+def test_semantic_slot_filler_rejects_non_slot_key():
     class _BadGateway(_Gateway):
         def call(
             self,
@@ -177,7 +177,7 @@ def test_semantic_slot_filler_rejects_protected_key():
             )
 
     filler = SemanticSlotFiller(_BadGateway())
-    with pytest.raises(ValueError, match="protected"):
+    with pytest.raises(ValueError, match="semantic slot fill"):
         GoalInterpreter().interpret("이 작업을 처리해줘", semantic_fill=filler)
 
 
