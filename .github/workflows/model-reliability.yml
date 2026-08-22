@@ -42,6 +42,7 @@ jobs:
           tests/unit/test_model_response_framing.py
           tests/unit/test_targeting_compiler_reliability.py
           tests/unit/test_gateway_assembly.py
+          tests/unit/test_run_manifest.py
       - name: Focused tests
         run: >-
           python -m pytest -q
@@ -53,3 +54,4 @@ jobs:
           tests/unit/test_model_response_framing.py
           tests/unit/test_targeting_compiler_reliability.py
           tests/unit/test_gateway_assembly.py
+          tests/unit/test_run_manifest.py

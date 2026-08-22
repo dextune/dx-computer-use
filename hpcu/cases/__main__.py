@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,7 +20,7 @@ from hpcu.gateway.registry import create_gateway
 from hpcu.grounder.grounder import Grounder
 from hpcu.observation.facade import CompositeObserver
 from hpcu.platform.linux.sandbox import create_sandbox_backends, probe
-from hpcu.runtime_config import load_runtime_config
+from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -27,6 +30,106 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--base-url", default="http://127.0.0.1:1337")
     return parser.parse_args(argv)
+
+
+def _stable_sha256(value: object) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _source_revision() -> str:
+    for key in ("GITHUB_SHA", "SOURCE_REVISION"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip()
+
+
+def _case_contract(spec: object) -> dict[str, object]:
+    entry = getattr(spec, "entry", None)
+    evidence = getattr(spec, "evidence", None)
+    surface = getattr(spec, "surface", "")
+    return {
+        "id": str(getattr(spec, "id", "")),
+        "goal": str(getattr(spec, "goal", "")),
+        "start_url": str(getattr(spec, "start_url", "")),
+        "surface": str(getattr(surface, "value", surface)),
+        "entry": {
+            "kind": str(getattr(getattr(entry, "kind", ""), "value", "")),
+            "value": str(getattr(entry, "value", "")),
+        },
+        "require_pick": bool(getattr(evidence, "require_pick", False)),
+        "max_attempts": int(getattr(spec, "max_attempts", 0)),
+        "max_model_calls": int(getattr(spec, "max_model_calls", 0)),
+    }
+
+
+def _manifest_payload(
+    specs: list[object],
+    runtime_config: dict,
+    *,
+    cases_argument: Path | None,
+    limit: int,
+    source_revision: str | None = None,
+) -> dict[str, object]:
+    contracts = [_case_contract(spec) for spec in specs]
+    identity = configured_semantic_identity(runtime_config)
+    return {
+        "schema_version": 1,
+        "source_revision": (
+            _source_revision() if source_revision is None else source_revision
+        ),
+        "entrypoint": "hpcu/cases/__main__.py",
+        "python_version": sys.version.split()[0],
+        "cases_argument": str(cases_argument) if cases_argument else "<default>",
+        "limit": int(limit),
+        "provider": identity.provider_id,
+        "model": identity.model_id,
+        "case_count": len(contracts),
+        "case_ids": [str(item["id"]) for item in contracts],
+        "case_contract_sha256": _stable_sha256(contracts),
+        "runtime_config_sha256": _stable_sha256(runtime_config),
+        "cases": contracts,
+    }
+
+
+def _write_run_manifest(
+    out_dir: Path,
+    specs: list[object],
+    runtime_config: dict,
+    *,
+    cases_argument: Path | None,
+    limit: int,
+) -> Path:
+    manifest_path = out_dir / "run-manifest.json"
+    payload = _manifest_payload(
+        specs,
+        runtime_config,
+        cases_argument=cases_argument,
+        limit=limit,
+    )
+    manifest_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def _build_gateway(runtime_config: dict) -> CountingGateway:
@@ -59,10 +162,17 @@ async def _run(args: argparse.Namespace) -> int:
         specs = specs[: args.limit]
     cases_path = args.out / "cases.txt"
     cases_path.write_text("\n".join(spec.id for spec in specs) + "\n", encoding="utf-8")
+    runtime_config = load_runtime_config()
+    _write_run_manifest(
+        args.out,
+        specs,
+        runtime_config,
+        cases_argument=args.cases,
+        limit=args.limit,
+    )
     if not probe(args.base_url):
         print("sandbox unreachable", file=sys.stderr)
         return 2
-    runtime_config = load_runtime_config()
     try:
         gateway = _build_gateway(runtime_config)
     except ValueError as error:
