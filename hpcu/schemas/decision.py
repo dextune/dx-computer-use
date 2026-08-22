@@ -8,13 +8,15 @@ the gateway and is checked at the gateway boundary, never hardcoded here.
 
 from __future__ import annotations
 
-import json
-import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable
 
 from hpcu.gateway.gateway import SemanticIdentity
+from hpcu.gateway.json_response import (
+    extract_first_json_object,
+    select_json_object,
+)
 from hpcu.runtime_config import configured_semantic_identity
 from hpcu.schemas.scene import Scene
 
@@ -209,7 +211,11 @@ def parse_situation_analysis(
     expected_model: str | None = None,
 ) -> SituationAnalysis:
     """Parse strict JSON; optionally validate identity supplied by the caller."""
-    payload = _load_exact_object(content, _EXACT_SITUATION_KEYS)
+    payload = _load_exact_object(
+        content,
+        _EXACT_SITUATION_KEYS,
+        schema_name="situation analysis",
+    )
     selected_model = model or _default_model_id()
     _require_expected_model(selected_model, expected_model)
     parsed_scene_version = _int(payload, "scene_version")
@@ -243,7 +249,11 @@ def parse_action_decision(
     expected_model: str | None = None,
 ) -> ActionDecision:
     """Parse and bind an action response to the current neutral scene."""
-    payload = _load_exact_object(content, _EXACT_ACTION_KEYS)
+    payload = _load_exact_object(
+        content,
+        _EXACT_ACTION_KEYS,
+        schema_name="action decision",
+    )
     selected_model = model or _default_model_id()
     _require_expected_model(selected_model, expected_model)
     decision = ActionDecision(
@@ -277,7 +287,11 @@ def parse_reanalysis(
     expected_model: str | None = None,
 ) -> ReanalysisDecision:
     """Parse a strict post-action/recovery response."""
-    payload = _load_exact_object(content, _EXACT_REANALYSIS_KEYS)
+    payload = _load_exact_object(
+        content,
+        _EXACT_REANALYSIS_KEYS,
+        schema_name="reanalysis decision",
+    )
     selected_model = model or _default_model_id()
     _require_expected_model(selected_model, expected_model)
     parsed_scene_version = _int(payload, "scene_version")
@@ -311,80 +325,21 @@ def _validate_common(
 
 
 def _extract_json_object(content: str) -> Any:
-    """Extract the first JSON object from a provider response.
-
-    Tries in order:
-    1. Whole content as JSON.
-    2. First ```json ``` fenced block.
-    3. First ``` ``` fenced block.
-    4. Bracket-counted extraction from first { to matching }.
-    """
-    # 1. direct parse
-    try:
-        return json.loads(content)
-    except (TypeError, json.JSONDecodeError):
-        pass
-
-    # 2. markdown json fence
-    match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-
-    # 3. any markdown fence
-    match = re.search(r"```\s*(\{.*?\})\s*```", content, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-
-    # 4. bracket-counted extraction
-    start = content.find("{")
-    if start == -1:
-        raise ValueError("no JSON object found in response")
-    depth = 0
-    in_string = False
-    escape = False
-    for i in range(start, len(content)):
-        ch = content[i]
-        if escape:
-            escape = False
-            continue
-        if ch == "\\":
-            escape = True
-            continue
-        if ch == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return json.loads(content[start : i + 1])
-
-    raise ValueError("unbalanced braces in response")
+    """Compatibility wrapper for callers that do not provide schema keys."""
+    return extract_first_json_object(content)
 
 
-def _load_exact_object(content: str, keys: frozenset[str]) -> dict[str, Any]:
-    preview = content[:200].replace("\n", " ")
-    try:
-        payload = _extract_json_object(content)
-    except ValueError as error:
-        raise ValueError(
-            f"{error} [raw_preview: {preview}]"
-        ) from error
-    if not isinstance(payload, dict) or keys - set(payload):
-        raise ValueError(
-            f"response does not match the strict decision schema"
-            f" [raw_preview: {preview}]"
-        )
-    return payload
+def _load_exact_object(
+    content: str,
+    keys: frozenset[str],
+    *,
+    schema_name: str,
+) -> dict[str, Any]:
+    return select_json_object(
+        content,
+        required_keys=keys,
+        schema_name=schema_name,
+    )
 
 
 def _require_expected_model(model: str, expected_model: str | None) -> None:
