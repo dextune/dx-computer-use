@@ -126,6 +126,11 @@ class ControlLoop:
     def scene_history(self) -> tuple[Scene, ...]:
         return tuple(self._scene_history)
 
+    def begin_task(self) -> None:
+        """Reset task-local recovery state while preserving the live scene."""
+        self._action_history.clear()
+        self._scene_history.clear()
+
     async def step(
         self,
         query: dict | None,
