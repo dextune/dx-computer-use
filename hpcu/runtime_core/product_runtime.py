@@ -11,7 +11,7 @@ from hpcu.planning.goal_interpreter import GoalInterpreter
 from hpcu.planning.plan_compiler import PlanCompiler
 from hpcu.planning.semantic_interrupt import SemanticSlotFiller
 from hpcu.planning.strategy_planner import StrategyPlanner
-from hpcu.runtime_config import load_runtime_config
+from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
 from hpcu.runtime_core.control_loop import ControlLoop
 from hpcu.runtime_core.task_budget import BudgetedGateway, TaskBudgetLedger
 from hpcu.runtime_core.task_runtime import Repairer, TaskRunResult, TaskRuntime
@@ -76,13 +76,16 @@ PlanningContextProvider = Callable[
 ]
 
 
-def _contains_retry_boundary(gateway: Gateway) -> bool:
-    """Detect an existing retry wrapper through transparent gateway layers."""
+def _contains_gateway_type(
+    gateway: Gateway,
+    gateway_type: type[Gateway],
+) -> bool:
+    """Inspect transparent wrapper layers without following cycles."""
     current: object | None = gateway
     seen: set[int] = set()
     while current is not None and id(current) not in seen:
         seen.add(id(current))
-        if isinstance(current, RetryableGateway):
+        if isinstance(current, gateway_type):
             return True
         current = getattr(current, "_inner", None)
     return False
@@ -104,6 +107,15 @@ class CommandRuntime:
         semantic_replanner_factory: RepairerFactory | None = None,
         config: dict | None = None,
     ) -> None:
+        self._config = config if config is not None else load_runtime_config()
+        if provider_gateway is not None:
+            if _contains_gateway_type(provider_gateway, BudgetedGateway):
+                raise ValueError(
+                    "provider gateway must not contain a pre-existing task budget"
+                )
+            provider_gateway.require_configured_identity(
+                configured_semantic_identity(self._config)
+            )
         self._control_loop_factory = control_loop_factory
         self._provider_gateway = provider_gateway
         self._planning_context_provider = planning_context_provider
@@ -112,7 +124,6 @@ class CommandRuntime:
         self._plan_compiler = plan_compiler or PlanCompiler()
         self._local_repairer = local_repairer
         self._semantic_replanner_factory = semantic_replanner_factory
-        self._config = config if config is not None else load_runtime_config()
 
     async def run(self, request: CommandRequest) -> CommandRunResult:
         ledger = TaskBudgetLedger(request.task_budget)
@@ -193,7 +204,7 @@ class CommandRuntime:
             return None
         limits = self._config.get("semantic", {}).get("request_limits", {})
         transport = self._provider_gateway
-        if not _contains_retry_boundary(transport):
+        if not _contains_gateway_type(transport, RetryableGateway):
             transport = RetryableGateway(
                 transport,
                 max_retries=int(limits.get("action_decision_retry_attempts", 2)),
