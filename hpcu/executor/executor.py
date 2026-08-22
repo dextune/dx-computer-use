@@ -1,10 +1,7 @@
 """Executor — prepare and run deterministic actions.
 
-The executor never touches OS input directly.  It delegates to an
-InputInjector: Call `semantic()` first, and fall back to `physical()`
-only when semantic is unsupported or fails.  If neither path is possible
-the executor returns an honest `ExecutionResult` with a failure code
-instead of pretending to succeed.
+The executor never touches OS input directly. It delegates to an InputInjector
+and fails closed when a command or freshness binding is invalid.
 """
 
 import asyncio
@@ -16,8 +13,9 @@ from typing import Callable, Optional
 from hpcu.input.injector import ExecutionResult, InputInjector
 from hpcu.runtime_config import load_runtime_config
 from hpcu.schemas.action import Action, ActionOp
-from hpcu.schemas.coordinates import ScreenPoint
+from hpcu.schemas.coordinates import BoundingBox, ScreenPoint
 from hpcu.schemas.failure_codes import FailureCode
+from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
 _COMMAND_TO_OP = {
@@ -36,10 +34,6 @@ _COMMAND_TO_OP = {
     "focus": ActionOp.FOCUS_WINDOW,
 }
 
-
-# Op -> injector command name.  The value is what InputInjector.semantic()
-# and InputInjector.physical() understand.  Ops that are postcondition-only
-# (wait_until / assert / checkpoint) are still mapped so prepare() is total.
 _OP_COMMAND = {
     ActionOp.INVOKE: "invoke",
     ActionOp.NAVIGATE: "invoke",
@@ -56,35 +50,33 @@ _OP_COMMAND = {
     ActionOp.FOCUS_WINDOW: "focus",
 }
 
+_COMMAND_RE = re.compile(r"^[a-z_]+$")
+
 
 def _command_for(op: ActionOp) -> str:
-    """Map an ActionOp to the command string the injector understands."""
     return _OP_COMMAND.get(op, op.value)
+
+
+def is_valid_command(command: str) -> bool:
+    return bool(_COMMAND_RE.fullmatch(command))
 
 
 @dataclass(frozen=True)
 class PreparedAction:
-    """A resolved action ready for execution.
-
-    `command` is the string handed to the injector.  `element` and
-    `physical_point` carry the already-resolved target (filled by the
-    caller/control loop) so execute() can dispatch without a scene.
-    """
+    """Resolved action bound to the scene from which it was prepared."""
 
     action: Action
     element_id: Optional[str]
     command: str
     element: Optional[UIElement] = None
     physical_point: Optional[ScreenPoint] = None
+    source_scene_version: int | None = None
+    source_frame_id: str | None = None
+    target_fingerprint: str | None = None
+    target_bbox: BoundingBox | None = None
 
 
 class Executor:
-    """Action executor bound to a single InputInjector.
-
-    The executor is injector-only: it never imports a platform package and
-    never resolves coordinates itself.
-    """
-
     def __init__(
         self,
         injector: InputInjector,
@@ -121,28 +113,36 @@ class Executor:
         *,
         element: Optional[UIElement] = None,
         physical_point: Optional[ScreenPoint] = None,
+        source_scene: Optional[Scene] = None,
     ) -> PreparedAction:
-        """Resolve an Action into a PreparedAction without executing it.
-
-        prepare() is deterministic and pure: it derives the injector
-        command from the action op and keeps the caller's resolved target.
-        """
+        frame_id = None
+        scene_version = None
+        if source_scene is not None:
+            scene_version = source_scene.version
+            frame_id = source_scene.frame.shm_id if source_scene.frame else None
         return PreparedAction(
             action=action,
             element_id=element_id,
             command=_command_for(action.op),
             element=element,
             physical_point=physical_point,
+            source_scene_version=scene_version,
+            source_frame_id=frame_id,
+            target_fingerprint=element.fingerprint if element is not None else None,
+            target_bbox=element.bbox if element is not None else None,
         )
 
-    async def execute(self, prepared: PreparedAction) -> ExecutionResult:
-        """Run a prepared action: semantic first, physical fallback.
+    async def execute(
+        self,
+        prepared: PreparedAction,
+        *,
+        current_scene: Scene | None = None,
+    ) -> ExecutionResult:
+        """Execute only when the prepared target still belongs to the same scene."""
+        stale = self._freshness_failure(prepared, current_scene)
+        if stale is not None:
+            return stale
 
-        When a resolved element is present the semantic path is tried
-        first.  If it is unsupported or fails, physical pointer/key input
-        is attempted when a point is available.  If neither path can run,
-        an unsupported result is returned with INPUT_PHYSICAL_UNSUPPORTED.
-        """
         if prepared.element is not None:
             semantic_result = await self._injector.semantic(
                 prepared.element, prepared.command
@@ -160,9 +160,51 @@ class Executor:
 
         return ExecutionResult(
             success=False,
-            mode="physical",
+            mode="none",
             failure_code=FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value,
         )
+
+    def _freshness_failure(
+        self,
+        prepared: PreparedAction,
+        current_scene: Scene | None,
+    ) -> ExecutionResult | None:
+        if current_scene is None or prepared.source_scene_version is None:
+            return None
+        if current_scene.version != prepared.source_scene_version:
+            return ExecutionResult(
+                success=False,
+                mode="none",
+                failure_code=FailureCode.STALE_DECISION.value,
+            )
+        if prepared.source_frame_id is not None:
+            current_frame_id = (
+                current_scene.frame.shm_id if current_scene.frame else None
+            )
+            if current_frame_id != prepared.source_frame_id:
+                return ExecutionResult(
+                    success=False,
+                    mode="none",
+                    failure_code=FailureCode.STALE_DECISION.value,
+                )
+        if prepared.element_id is not None:
+            current = current_scene.get(prepared.element_id)
+            if current is None:
+                return ExecutionResult(
+                    success=False,
+                    mode="none",
+                    failure_code=FailureCode.STALE_DECISION.value,
+                )
+            if (
+                prepared.target_fingerprint is not None
+                and current.fingerprint != prepared.target_fingerprint
+            ):
+                return ExecutionResult(
+                    success=False,
+                    mode="none",
+                    failure_code=FailureCode.STALE_DECISION.value,
+                )
+        return None
 
     async def inject_physical(
         self,
@@ -170,12 +212,14 @@ class Executor:
         command: str,
         text: str | None = None,
     ) -> ExecutionResult:
-        """Run a physical injector command through the Action DSL.
-
-        Case loops and recovery use this instead of talking to an OS
-        injector. Adapters still only see (point, command, text).
-        """
-        op = _COMMAND_TO_OP.get(command, ActionOp.CLICK)
+        """Run a known physical command; unknown commands never become clicks."""
+        if not is_valid_command(command) or command not in _COMMAND_TO_OP:
+            return ExecutionResult(
+                success=False,
+                mode="none",
+                failure_code=FailureCode.ACTION_UNSUPPORTED.value,
+            )
+        op = _COMMAND_TO_OP[command]
         action = Action(
             id=f"physical-{command}",
             op=op,
@@ -192,17 +236,7 @@ class Executor:
         *,
         required_stable_polls: Optional[int] = None,
     ) -> bool:
-        """Poll `predicate` until it holds stably or `timeout_ms` elapses.
-
-        `wait_until` defaults to one true poll. `settle_detector` requires
-        consecutive true polls from config. Sleep is injected (`self._sleep`)
-        so tests never wait on a real clock.
-        """
-        needed = (
-            required_stable_polls
-            if required_stable_polls is not None
-            else 1
-        )
+        needed = required_stable_polls if required_stable_polls is not None else 1
         deadline_at = self._monotonic() + (timeout_ms / 1000.0)
         stable = 0
         while True:
@@ -219,19 +253,8 @@ class Executor:
     async def settle_detector(
         self, predicate: Callable[[], bool], timeout_ms: int
     ) -> bool:
-        """Wait until `predicate` holds for N consecutive polls (config)."""
         return await self.wait_until(
             predicate,
             timeout_ms,
             required_stable_polls=self._required_stable_polls,
         )
-
-
-# Kept for explicitness in trace/reporting: a command string should be a
-# simple snake_case token with no whitespace.
-_COMMAND_RE = re.compile(r"^[a-z_]+$")
-
-
-def is_valid_command(command: str) -> bool:
-    """Whether a command string is a well-formed injector token."""
-    return bool(_COMMAND_RE.match(command))

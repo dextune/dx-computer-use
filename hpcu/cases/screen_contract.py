@@ -3,11 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-
-class SurfaceKind(str, Enum):
-    BROWSER = "browser"
-    TERMINAL = "terminal"
-    CHALLENGE = "challenge"
+from hpcu.schemas.surface import SurfaceKind
 
 
 class EntryKind(str, Enum):
@@ -55,8 +51,6 @@ class EntryContract:
 
 @dataclass(frozen=True)
 class ChallengePolicy:
-    """Access-control challenges always stop and request a human."""
-
     outcome: CaseOutcome = CaseOutcome.HUMAN_HANDOFF
     allow_credential_input: bool = False
     allow_refresh_or_alternate_route: bool = False

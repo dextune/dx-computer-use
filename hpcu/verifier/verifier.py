@@ -1,15 +1,9 @@
-"""Verifier — evaluate EvidenceContract and postconditions against a Scene.
-
-Every EvidenceKind maps to a deterministic scene check.  Completion kinds
-that a bare Scene cannot prove (file existence, API status) evaluate to
-False — the runtime never claims success it cannot substantiate from the
-current screen state.
-"""
+"""Verifier — deterministic evidence and transition verification."""
 
 import re
 from typing import Optional
 
-from hpcu.schemas.action import Postcondition, PostconditionKind
+from hpcu.schemas.action import Action, ActionOp, Postcondition, PostconditionKind
 from hpcu.schemas.evidence import EvidenceCondition, EvidenceContract, EvidenceKind
 from hpcu.schemas.evidence_state import (
     EvidenceObservation,
@@ -20,20 +14,34 @@ from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
 _INT_PATTERN = re.compile(r"(\d+)")
+_SIDE_EFFECT_OPS = frozenset(
+    {
+        ActionOp.FOCUS_WINDOW,
+        ActionOp.NAVIGATE,
+        ActionOp.INVOKE,
+        ActionOp.CLICK,
+        ActionOp.DOUBLE_CLICK,
+        ActionOp.RIGHT_CLICK,
+        ActionOp.TYPE,
+        ActionOp.REPLACE_TEXT,
+        ActionOp.HOTKEY,
+        ActionOp.SELECT,
+        ActionOp.TOGGLE,
+        ActionOp.SCROLL,
+        ActionOp.DRAG,
+        ActionOp.CALL_TOOL,
+        ActionOp.REQUEST_APPROVAL,
+    }
+)
 
 
 class Verifier:
-    """Pure scene evaluator for completion and postcondition evidence.
-
-    Carries no platform dependencies and never calls the model.
-    """
+    """Pure scene evaluator; model claims are never accepted as evidence."""
 
     def verify(self, contract: EvidenceContract, scene: Scene) -> bool:
-        """Return True only when independent screen evidence is satisfied."""
         return self.verify_state(contract, scene).satisfied
 
     def verify_state(self, contract: EvidenceContract, scene: Scene) -> EvidenceState:
-        """Return structured condition evidence without accepting model claims."""
         conditions = contract.all or contract.any
         if not conditions:
             return EvidenceState(
@@ -52,10 +60,7 @@ class Verifier:
             )
             for index, condition in enumerate(conditions)
         )
-        checks = [
-            observation.status is EvidenceStatus.SATISFIED
-            for observation in observations
-        ]
+        checks = [item.status is EvidenceStatus.SATISFIED for item in observations]
         satisfied = all(checks) if contract.all else any(checks)
         return EvidenceState(
             scene_version=scene.version,
@@ -73,20 +78,26 @@ class Verifier:
         scene: Scene,
         last_action: Optional[object] = None,
     ) -> bool:
-        """Return True when every postcondition holds on the scene.
-
-        `last_action` is accepted for context/trace purposes but the
-        verdict depends only on the current scene state.
-        """
+        del last_action
         if not postconditions:
             return True
-        return all(
-            self._check_postcondition(cond, scene) for cond in postconditions
-        )
+        return all(self._check_postcondition(cond, scene) for cond in postconditions)
 
-    # ------------------------------------------------------------------
-    # EvidenceCondition -> scene check
-    # ------------------------------------------------------------------
+    def verify_transition(self, action: Action, before: Scene, after: Scene) -> bool:
+        """Prove a side-effect using a fresh post-action scene.
+
+        Mutating actions require explicit postconditions that were false before
+        execution and true afterward.  This deliberately rejects weak proofs
+        such as "the button I clicked is visible", which were already true in
+        the pre-action scene and therefore cannot establish the click's effect.
+        """
+        if action.op not in _SIDE_EFFECT_OPS:
+            return self.verify_postconditions(action.postconditions, after)
+        if not action.postconditions:
+            return False
+        if self.verify_postconditions(action.postconditions, before):
+            return False
+        return self.verify_postconditions(action.postconditions, after)
 
     def _check_evidence_condition(
         self, condition: EvidenceCondition, scene: Scene
@@ -95,93 +106,64 @@ class Verifier:
         target = condition.target
         product_match = condition.product_match
         value = condition.value
-
         if kind is EvidenceKind.ELEMENT_VISIBLE:
-            element = self._locate(scene, target, product_match)
-            return self._is_visible(element)
-
+            return self._is_visible(self._locate(scene, target, product_match))
         if kind is EvidenceKind.ELEMENT_ABSENT:
             return target not in scene
-
         if kind is EvidenceKind.TEXT_EQUALS:
             element = self._locate(scene, target, product_match)
-            if element is None:
-                return False
-            return self._element_text(element) == str(value)
-
+            return element is not None and self._element_text(element) == str(value)
         if kind is EvidenceKind.STATE_MATCHES:
-            element = self._locate(scene, target, product_match)
-            return self._state_matches(element, value)
-
+            return self._state_matches(
+                self._locate(scene, target, product_match), value
+            )
         if kind is EvidenceKind.CART_CONTAINS:
-            if product_match:
-                element = self._find_by_product(scene, product_match)
-            else:
-                element = self._locate(scene, target, None)
+            element = (
+                self._find_by_product(scene, product_match)
+                if product_match
+                else self._locate(scene, target, None)
+            )
             return element is not None
-
         if kind in (EvidenceKind.QUANTITY_AT_LEAST, EvidenceKind.BADGE_VALUE):
-            if product_match:
-                element = self._find_by_product(scene, product_match)
-            else:
-                element = self._locate(scene, target, None)
-            if element is None:
-                return False
-            return self._extract_int(self._element_text(element)) >= (value or 0)
-
+            element = (
+                self._find_by_product(scene, product_match)
+                if product_match
+                else self._locate(scene, target, None)
+            )
+            return (
+                element is not None
+                and self._extract_int(self._element_text(element)) >= (value or 0)
+            )
         if kind is EvidenceKind.NOTIFICATION_SHOWN:
-            element = self._locate(scene, target, product_match)
-            return self._is_visible(element)
-
-        # file / API evidence cannot be proven from a bare Scene snapshot.
+            return self._is_visible(self._locate(scene, target, product_match))
         return False
 
-    # ------------------------------------------------------------------
-    # Postcondition -> scene check
-    # ------------------------------------------------------------------
-
-    def _check_postcondition(
-        self, postcondition: Postcondition, scene: Scene
-    ) -> bool:
+    def _check_postcondition(self, postcondition: Postcondition, scene: Scene) -> bool:
         kind = postcondition.kind
         target = postcondition.target
-
         if kind is PostconditionKind.ELEMENT_VISIBLE:
             return self._is_visible(scene.get(target)) if target else False
-
         if kind is PostconditionKind.ELEMENT_ENABLED:
             element = scene.get(target) if target else None
             return element is not None and element.state.enabled
-
         if kind is PostconditionKind.ELEMENT_FOCUSED:
             element = scene.get(target) if target else None
             return element is not None and element.state.selected
-
         if kind is PostconditionKind.TEXT_EQUALS:
             element = scene.get(target) if target else None
-            if element is None:
-                return False
-            return self._element_text(element) == str(postcondition.value)
-
+            return (
+                element is not None
+                and self._element_text(element) == str(postcondition.value)
+            )
         if kind is PostconditionKind.STATE_MATCHES:
-            # value truthiness maps to the element's selected state.
             return self._state_matches(
                 scene.get(target) if target else None, postcondition.value
             )
-
         if kind is PostconditionKind.ELEMENT_ABSENT:
             return target not in scene
-
         if kind is PostconditionKind.ELEMENT_COUNT_AT_LEAST:
-            count = self._count_matching(scene, target)
-            return count >= (postcondition.value or 0)
-
-        # file / API postconditions are not provable from the scene snapshot.
+            return self._count_matching(scene, target) >= (postcondition.value or 0)
         return False
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _element_text(element: Optional[UIElement]) -> str:
@@ -194,12 +176,8 @@ class Verifier:
         return element is not None and element.state.visible
 
     @staticmethod
-    def _state_matches(
-        element: Optional[UIElement], value: Optional[int]
-    ) -> bool:
-        if element is None:
-            return False
-        return element.state.selected == bool(value)
+    def _state_matches(element: Optional[UIElement], value: Optional[int]) -> bool:
+        return element is not None and element.state.selected == bool(value)
 
     @staticmethod
     def _extract_int(text: str) -> int:
@@ -210,7 +188,6 @@ class Verifier:
     def _locate(
         cls, scene: Scene, target: Optional[str], product_match: Optional[str]
     ) -> Optional[UIElement]:
-        """Resolve an element by id or product name, with id precedence."""
         if target and target in scene:
             element = scene.get(target)
             if product_match is None:
@@ -223,7 +200,6 @@ class Verifier:
 
     @staticmethod
     def _find_by_product(scene: Scene, product_match: str) -> Optional[UIElement]:
-        """Find the first element whose text/name mentions the product."""
         needle = product_match.casefold()
         for element in scene.elements.values():
             if needle in Verifier._element_text(element).casefold():
@@ -232,7 +208,6 @@ class Verifier:
 
     @staticmethod
     def _count_matching(scene: Scene, target: Optional[str]) -> int:
-        """Count elements whose role, name, or source type equals target."""
         if target is None:
             return len(scene.elements)
         count = 0

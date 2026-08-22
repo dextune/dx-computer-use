@@ -38,6 +38,7 @@ class FailureCode(str, Enum):
     TARGET_NOT_FOUND = "target_not_found"
     ACTION_TIMEOUT = "action_timeout"
     ACTION_REJECTED_BY_POLICY = "action_rejected_by_policy"
+    ACTION_UNSUPPORTED = "action_unsupported"
 
     # --- verification ---
     VERIFICATION_FAILED = "verification_failed"
@@ -48,6 +49,7 @@ class FailureCode(str, Enum):
     MODEL_SCHEMA_INVALID = "model_schema_invalid"
     MODEL_RESPONSE_INVALID = "model_response_invalid"
     MODEL_FAILED = "model_failed"
+    MODEL_BUDGET_EXHAUSTED = "model_budget_exhausted"
     DECISION_REQUIRED = "decision_required"
 
     # --- challenge / human handoff ---

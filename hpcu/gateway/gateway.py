@@ -9,7 +9,9 @@ from typing import Optional
 class ModelCallPurpose(str, Enum):
     """Why the configured semantic model was called."""
 
+    INTENT_FILL = "intent_fill"
     PLAN_COMPILE = "plan_compile"
+    GROUNDING = "grounding"
     SITUATION_ANALYSIS = "situation_analysis"
     ACTION_DECISION = "action_decision"
     POST_ACTION_REANALYSIS = "post_action_reanalysis"
@@ -65,10 +67,7 @@ class Gateway(ABC):
         return SemanticIdentity(self.provider_id, self.model_id)
 
     def require_configured_identity(self, expected: SemanticIdentity) -> None:
-        """Fail closed unless this gateway matches the selected deployment.
-
-        Concrete adapters must expose both provider and model identities.
-        """
+        """Fail closed unless this gateway matches the selected deployment."""
         if self.identity != expected:
             raise ValueError(
                 "semantic gateway identity mismatch: "
