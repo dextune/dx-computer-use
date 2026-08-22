@@ -29,6 +29,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _build_gateway(runtime_config: dict) -> CountingGateway:
+    """Build one logical-call counter outside transparent transport retries.
+
+    The old wrapper order counted every transient HTTP retry as a new semantic
+    model call. That made call budgets and run statistics lie. Counting now
+    occurs once per compiler/decision request, while ``RetryableGateway`` may
+    transparently retry the same request below that accounting boundary.
+    """
+    semantic_limits = runtime_config.get("semantic", {}).get(
+        "request_limits", {}
+    )
+    retry_attempts = int(semantic_limits.get("action_decision_retry_attempts", 2))
+    retry_base = int(semantic_limits.get("retry_base_delay_ms", 500))
+    retry_max = int(semantic_limits.get("retry_max_delay_ms", 8000))
+    transport = RetryableGateway(
+        create_gateway(runtime_config),
+        max_retries=retry_attempts,
+        base_delay_ms=retry_base,
+        max_delay_ms=retry_max,
+    )
+    return CountingGateway(transport)
+
+
 async def _run(args: argparse.Namespace) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     specs = load_cases(args.cases)
@@ -41,16 +64,7 @@ async def _run(args: argparse.Namespace) -> int:
         return 2
     runtime_config = load_runtime_config()
     try:
-        semantic_limits = runtime_config.get("semantic", {}).get("request_limits", {})
-        retry_attempts = int(semantic_limits.get("action_decision_retry_attempts", 2))
-        retry_base = int(semantic_limits.get("retry_base_delay_ms", 500))
-        retry_max = int(semantic_limits.get("retry_max_delay_ms", 8000))
-        gateway = RetryableGateway(
-            CountingGateway(create_gateway(runtime_config)),
-            max_retries=retry_attempts,
-            base_delay_ms=retry_base,
-            max_delay_ms=retry_max,
-        )
+        gateway = _build_gateway(runtime_config)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
