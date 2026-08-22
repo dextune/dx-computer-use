@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 import pytest
 
@@ -294,7 +293,7 @@ async def test_task_runtime_applies_one_bounded_local_patch():
     assert len(result.patch_lineage) == 1
     completions = [
         item
-        for item in loop.recorder.records
+        for item in loop.recorder.records()
         if item.event_type is TraceEventType.COMPLETION
     ]
     assert len(completions) == 1
