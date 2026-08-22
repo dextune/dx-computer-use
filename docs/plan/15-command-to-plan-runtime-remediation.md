@@ -1,697 +1,790 @@
 ---
 title: "HPCU Runtime 개발 계획 15 — 사용자 명령→PlanIR→단일 실행 런타임 개선"
-version: "1.0"
-date: "2026-08-22"
-parent: "AGENTS.md, docs/plan/00-overview-and-goals.md, docs/plan/06-grounding-confidence.md, docs/plan/07-action-dsl-runtime.md, docs/plan/09-workflow-compiler.md, docs/plan/11-quality-benchmark.md, docs/plan/13-common-pipeline-remediation.md, docs/plan/14-goal-compiled-targeting.md"
+version: "1.1"
+date: "2026-08-23"
+parent: "AGENTS.md, docs/plan/00-overview-and-goals.md, docs/plan/06-grounding-confidence.md, docs/plan/07-action-dsl-runtime.md, docs/plan/08-model-gateway.md, docs/plan/09-workflow-compiler.md, docs/plan/11-quality-benchmark.md, docs/plan/13-common-pipeline-remediation.md, docs/plan/14-goal-compiled-targeting.md, docs/plan/16-model-response-reliability.md"
 language: "ko-KR"
 ---
 
 # 15. 사용자 명령→PlanIR→단일 실행 런타임 개선
 
-현재 `main`의 코드·문서·저장된 실행 아티팩트를 대조해 발견한 **제품 경로 부채**를
-해소하는 구현 순서다. 이 문서는 새 스펙을 중복해서 소유하지 않는다.
+이 문서는 HPCU의 **제품 실행 경로를 하나로 수렴시키는 구현 순서**를 소유한다.
+새 스펙을 여기저기 복제하지 않는다.
 
-- 명령 해석·전략 선택·PlanIR의 새 경계와 마이그레이션 순서는 이 문서가 소유한다.
+- 명령 해석·전략 선택·PlanIR·replan·단일 task runtime의 마이그레이션 순서는 이 문서가 소유한다.
 - Action DSL·실행·검증 계약은 `07-action-dsl-runtime.md`가 소유한다.
 - Grounding·confidence·모델 승격은 `06-grounding-confidence.md`가 소유한다.
+- provider 응답/identity 계약은 `08-model-gateway.md`와 `16-model-response-reliability.md`가 소유한다.
 - 경험 승격·workflow qualification은 `09-workflow-compiler.md`가 소유한다.
 - 벤치마크 지표와 SLO는 `11-quality-benchmark.md`가 소유한다.
-- `TargetingPack` 어휘 계약은 `14-goal-compiled-targeting.md`가 소유하되,
-  본 계획 완료 후 **PlanIR node의 grounding hint**로 위치를 낮춘다.
-
-진행 체크는 `docs/plan/tasklist.md`의 **U-*** 항목에서만 한다.
+- `TargetingPack` 어휘 계약은 `14-goal-compiled-targeting.md`가 소유하되 최종 위치는 PlanIR node의 grounding hint다.
+- 진행 체크는 `docs/plan/tasklist.md`의 **U1~U9**에서만 한다. 코드가 존재해도 통합 gate가 없으면 `[x]`가 아니다.
 
 ---
 
-## 1. 검수 기준점
+## 1. 2026-08-23 기준점
 
-검수 기준은 `main` commit `da147dbc87d1ecbe1a364907b9a61e107e0c8a36`
-(`feat: add provider-neutral screen runtime and retry evidence`)이다.
+현재 기준은 `main` merge commit
+`1a9c7616fff9eed56f3bf6a0d4404bfe49bbaa52`다.
 
-저장된 최신 재시도 결과
-`artifacts/retries/failed-cases-loop-15/stats.json`은 5/5 성공을 기록했지만,
-그 수치를 제품 일반화의 증거로 사용하지 않는다.
+이 기준점에는 다음 기반 코드가 이미 존재한다.
 
-- 5개 케이스, `model_call_count=9`, `model_tokens=8477`
-- `compile_call_count=5`, `grounding_call_count=4`
-- 케이스 elapsed 합 79,659ms
-- 저장된 모델 latency 합 58,736ms — 순차 합 기준 전체의 약 73.7%
-- `action_count=67`에는 capture·settle·model·evidence 진단 이벤트가 포함됨
-- 5개 케이스 모두 완성된 `start_url`을 제공하고 실제 인페이지 선택은 검증하지 않음
-- `430 passed, 4 deselected` 실행은 live provider를 포함하지 않음
-- `tests/integration/`, `tests/replay/`는 현재 실질 테스트가 없음
+- `GoalInterpreter`와 `GoalEnvelope`: navigate/search/select/compare/edit/submit intent 분류, CPU-first entity/risk/constraint 추출
+- `SemanticSlotFiller`: unresolved slot만 semantic provider에 요청하는 경계
+- `StrategyPlanner`: capability-aware local strategy 선택
+- `PlanIR`, `PlanNode`, `PlanCompiler.compile_search()`
+- `TaskRuntime`: PlanIR node/edge 실행 상태기계
+- `TaskBudgetLedger`, `BudgetedGateway`: task-global semantic budget 기반
+- `ControlLoop`: observe → ground → policy → execute → fresh observe → verify
+- `PreparedAction` scene/frame/fingerprint freshness binding
+- unknown physical command fail-closed
+- bounded `FrameStore`
+- schema-directed JSON response framing, transport retry와 logical-call accounting 분리
 
-따라서 현재 결과가 증명하는 것은 브라우저 focus·주소창 입력·OCR 문자열 관찰의
-smoke path다. 사용자 명령의 유연한 방향 설정, 다단계 계획, 독립 검증,
-0-model-call replay는 아직 제품 경로로 증명되지 않았다.
+그러나 **제품 경로 완성으로 간주하지 않는다.** 현재 구현은 핵심 부품과 unit regression을
+만든 상태이고, 실제 case/product 실행 경로에는 아직 legacy path가 남아 있다.
 
----
+### 1.1 현재 구현 상태
 
-## 2. 한 줄 진단
-
-> `TargetingPack`은 사이트 사전을 지웠지만 **계획을 만들지는 않는다**.
-> 현재 제품 경로는 사실상 “완성 URL 입력 → 0~1회 클릭 → 문자열 확인”이며,
-> `CaseRunner`와 `ControlLoop`가 서로 다른 정책·예산·검증 규칙을 가진다.
-
-하위 컴포넌트는 재사용할 수 있다. 문제는 부품 수가 아니라 **상위 방향 결정과
-단일 실행 경로가 부재**한 것이다.
-
----
-
-## 3. 현재 결함 스냅샷
-
-| ID | 증상 | 직접 영향 |
+| 영역 | 현재 상태 | 제품 위험 |
 |---|---|---|
-| D1 | 자연어 명령을 intent·제약·terminal state·작업 DAG로 변환하는 경계가 없음 | 새 케이스를 `start_url`과 어휘 팩으로 축소하게 됨 |
-| D2 | `TargetingPack`이 goal compiler의 결과처럼 사용됨 | 어휘 힌트가 전략·계획·증거를 대신함 |
-| D3 | `CaseRunner`가 gateway·input·retry·verification을 직접 소유하고 `ControlLoop`를 우회 | 정책·stale·예산 규칙이 경로마다 달라짐 |
-| D4 | `ControlLoop.step()`이 action 후 fresh scene을 관찰하지 않고 이전 scene으로 postcondition 평가 | no-op action도 성공 가능 |
-| D5 | 모델이 evidence token을 만들고 같은 token으로 성공을 판정 | 독립 oracle 부재, false-success 가능 |
-| D6 | `_case_model_calls`가 attempt마다 초기화되고 compile/reanalysis와 분리 | task 전체 모델 예산이 보장되지 않음 |
-| D7 | 모델 schema는 여러 Action을 허용하지만 `CaseRunner`는 실질적으로 click/none만 처리 | 다단계 type·select·scroll 작업 표현 불가 |
-| D8 | unknown physical command가 `CLICK`으로 기본 변환 | malformed command가 side effect로 바뀌는 fail-open |
-| D9 | tile hash·ring buffer·IoU tracker가 실제 `CompositeObserver` hot path에 연결되지 않음 | CPU-first가 증분 처리보다 반복 OCR에 가까움 |
-| D10 | OCR element의 `scene_version`까지 equality 비교하고 안정 ID가 약함 | unchanged screen도 modified로 보일 수 있음 |
-| D11 | OCR source의 이론상 최대 score가 기본 local threshold보다 낮은 구간이 있음 | local direct path가 구조상 막히고 runner가 별도 우회 |
-| D12 | workflow compiler가 verified transition보다 action record 복사에 가까움 | 0-call replay qualification을 증명하지 못함 |
-| D13 | `action_count`가 실제 input과 trace event를 섞음 | 성능·효율 지표가 해석 불가능 |
-| D14 | integration/replay/held-out gate가 비어 있음 | 단위 테스트 통과가 제품 능력으로 오인됨 |
+| Goal 해석 | 기반 구현 있음 | canonical context/cache와 실제 product entry 연결 미완료 |
+| Strategy 선택 | screen/tool 전략의 최소 구현 | 후보 전략 비교·workflow cache·surface 전환이 얕음 |
+| PlanIR | search 4-node 예제 구현 | navigate/select/compare/edit/submit compiler 부재 |
+| TaskRuntime | 고정 success/failure edge 실행 | 동적 local repair/replan 없음 |
+| ControlLoop | fresh observe + stale binding 구현 | temporal wait와 실제 loop history 연결 미완료 |
+| TaskBudget | 공통 ledger 구현 | `CaseRunner`의 attempt별 `_case_model_calls`가 별도로 존재 |
+| Semantic response | 공통 JSON framing 구현 | `SemanticSlotFiller`와 `ModelRouter`가 별도 parser/budget을 가짐 |
+| CaseRunner | 자체 gateway/input/retry/verification loop 유지 | 런타임이 사실상 두 벌 |
+| Evidence | Verifier 기반 경로 존재 | legacy runner는 TargetingPack token에 과도하게 의존 |
+| Recovery | LoopBreaker 구현 존재 | `ControlLoop`가 실제 history 대신 빈 history로 호출하는 경로 존재 |
+| CPU delta | tile hash/ring buffer 부품 존재 | 실제 observer hot path 연결·stable OCR identity 미완료 |
+| Workflow | compiler/replay 부품 존재 | verified transition 기반 qualification 미완료 |
+
+### 1.2 한 줄 진단
+
+> 좋은 신형 부품은 생겼지만, **제품 실행 경로가 아직 신형 아키텍처를 강제하지 않는다.**
+> 다음 단계의 목표는 기능 추가가 아니라 모든 실행·semantic·budget·verification을
+> 하나의 task lifecycle로 수렴시키는 것이다.
 
 ---
 
-## 4. 먼저 고정할 제품 경계
+## 2. 절대 목표와 비목표
 
-현재 문서에는 다음 두 문장이 동시에 존재한다.
-
-1. 허가된 API/CLI/DOM/접근성 조작이 가능하면 가장 빠른 로컬 경로를 우선한다.
-2. 화면 제어가 제품 기본 경계이며 DOM/CDP/API가 화면 제어를 대신하지 않는다.
-
-구현자가 임의로 해석하지 않도록 U1에서 실행 모드를 명시한다.
-
-### 4.1 `ExecutionMode`
-
-| 모드 | 관찰 | side effect | 용도 |
-|---|---|---|---|
-| `screen_strict` | Structure/OCR/geometry 사용 가능 | `InputInjector.physical`만 | 물리 화면 제어 자체를 검증하는 환경 |
-| `local_semantic` | API/CLI/DOM/AX/UIA/AT-SPI/OCR | policy가 허용한 semantic/tool action 후 화면 재검증 | 제품 성능·CPU/local-first 기본 모드 |
-
-공통 불변식:
-
-- 어느 모드든 side effect는 `Action` → `PolicyGate` → `Executor` 경로만 통과한다.
-- 직접 API/CLI 호출도 `ActionOp.CALL_TOOL`과 capability·policy·trace를 가져야 한다.
-- 화면 외부 효과를 사용해도 성공은 `EvidenceContract`로 독립 검증한다.
-- runner·recovery·plugin이 raw injector를 직접 호출하지 않는다.
-- 모드 결정은 사용자 명령, 정책, capability에 따라 plan-time에 고정한다.
-
-이 경계는 ADR로 이유를 기록하고, 실제 계약은 01·03·07·10의 소유 문서에 반영한다.
-
----
-
-## 5. 목표 아키텍처
+### 2.1 절대 목표
 
 ```text
 UserCommand
-    ↓
-GoalInterpreter
-    ├─ CPU: 숫자·날짜·가격·개수·부정·명시 앱/사이트·위험 동사 파싱
-    └─ Semantic interrupt: CPU가 채우지 못한 slot만 보완
-    ↓
-GoalEnvelope
-    ↓
-CapabilitySnapshot + CurrentContext + WorkflowIndex
-    ↓
-StrategyPlanner
-    ↓
-StrategyPlan
-    ↓
-PlanCompiler
-    ↓
-PlanIR (typed DAG / state machine)
-    ↓
-TaskRuntime
-    └─ ControlLoop.step(PlanNode)
-         observe delta
-         → ground
-         → policy + stale gate
-         → execute
-         → fresh observe
-         → verify transition
-         → recovery edge 또는 commit
-               ↓ unresolved only
-         SemanticInterrupt
-    ↓
-Trace → WorkflowCompiler → qualified replay
+  → GoalEnvelope
+  → CapabilitySnapshot + CurrentContext + WorkflowIndex
+  → StrategyPlan
+  → PlanIR
+  → TaskRuntime
+      → ControlLoop.step()
+          observe delta
+          → local ground
+          → policy + stale gate
+          → execute
+          → fresh observe
+          → verify transition
+          → local repair / failure edge
+      → bounded replan only when unresolved
+  → verified result
+  → Trace
+  → qualified Workflow
 ```
 
-`CaseRunner`는 이 경로를 조립하는 제품 런타임이 아니다. 마이그레이션 후에는
-case spec을 `GoalEnvelope` 입력으로 변환하고 결과·아티팩트를 수집하는 **test adapter**만 남긴다.
+정상 경로의 의미는 명확하다.
+
+- CPU/local path가 충분하면 runtime model call은 0회다.
+- 모델은 **계획의 빈 slot, ambiguous grounding, local recovery 소진**에서만 interrupt된다.
+- 모델은 좌표·현재 element ID·성공 여부를 임의로 확정하지 않는다.
+- side effect는 항상 Action DSL → Policy → Executor를 통과한다.
+- 성공은 fresh evidence로만 commit된다.
+
+### 2.2 비목표
+
+- 사이트/브랜드/CTA/광고/CAPTCHA 문자열 사전 추가
+- 모델에게 매 action을 다시 계획시키기
+- plan-time 모델이 좌표 또는 현재 scene element ID를 반환하게 하기
+- 실패 시 임의 lexical click
+- `CaseRunner`와 `TaskRuntime`을 장기간 dual-path로 유지
+- unit test 개수를 제품 성공률로 간주
+- 검증되지 않은 trajectory 자동 workflow 승격
+- CAPTCHA·로그인·보안 확인 우회
 
 ---
 
-## 6. 새 경계 DTO
+## 3. 제품 불변식
 
-경계 DTO는 `frozen dataclass + __post_init__` 검증을 기본으로 한다.
-모델 응답 DTO와 런타임 DTO를 같은 타입으로 쓰지 않는다.
+다음은 구현 편의를 위해 완화하지 않는다.
 
-### 6.1 `GoalEnvelope`
+1. **One task, one runtime.** 제품·case·replay는 동일 `TaskRuntime/ControlLoop`를 사용한다.
+2. **One task, one semantic ledger.** intent/plan/ground/reanalysis/recovery는 한 `TaskBudgetLedger`를 공유한다.
+3. **One semantic response boundary.** provider text는 공통 framing → schema parser를 통과한다.
+4. **No action from stale state.** ground 이후 scene/frame/target fingerprint가 변하면 재탐색 또는 halt한다.
+5. **Verification before commit.** low-level input 성공이나 모델의 success 문장만으로 완료하지 않는다.
+6. **Local repair before semantic replan.** 재캡처·재ground·alternate local strategy를 먼저 사용한다.
+7. **Irreversible progress is monotonic.** 이미 검증된 비가역 node를 replan이 되돌리거나 재실행하지 않는다.
+8. **No hidden fallback.** capability/model/budget 부재를 click이나 임의 intent로 숨기지 않는다.
 
-권장 위치: `hpcu/schemas/goal.py`
+---
+
+## 4. P0 — 제품 경로 단일화
+
+최우선 작업이다. P0가 닫히기 전에는 새 사이트 케이스나 새 모델 기능을 늘리지 않는다.
+
+### 4.1 `CaseRunner`를 test adapter로 축소
+
+현재 `CaseRunner`가 직접 소유하는 다음 책임을 제거한다.
+
+- gateway 호출
+- `_case_model_calls`와 attempt별 budget reset
+- target semantic decision
+- raw physical navigation/input
+- 별도 retry state machine
+- 별도 success/failure state machine
+- 별도 reanalysis verification
+
+최종 `CaseRunner` 책임은 다음뿐이다.
+
+```text
+CaseSpec
+→ UserCommand / entry context 변환
+→ product runtime 호출
+→ TaskRunResult/Trace 수집
+→ CaseStats/manifest/artifact 직렬화
+```
+
+**금지 CI rule:** `hpcu/cases/runner.py`가 `Gateway`, provider parser,
+`InputInjector` 또는 raw `inject_physical`을 import/호출하면 실패한다.
+
+### 4.2 task 시작 시 ledger를 한 번 만든다
+
+semantic gateway 조립 순서는 logical call accounting과 transport retry를 분리해야 한다.
+
+```text
+BudgetedGateway(
+    CountingGateway(
+        RetryableGateway(provider)
+    ),
+    task_ledger,
+)
+```
+
+- `TaskBudgetSpec`은 intent fill 이전에 request/config에서 생성한다.
+- 같은 ledger를 `SemanticSlotFiller`, plan compile, runtime interrupt, recovery가 공유한다.
+- attempt/node/replan 전환으로 ledger를 초기화하지 않는다.
+- transport retry는 새 semantic call로 계산하지 않는다.
+- budget 소진은 `MODEL_BUDGET_EXHAUSTED`로 종료/edge 전환한다.
+
+### 4.3 제품 composition root 하나
+
+제품 경로에서 다음 객체가 한 곳에서 조립되어야 한다.
+
+```text
+Observer
+Grounder
+Verifier
+RiskEngine / ApprovalGate
+Executor
+TraceRecorder
+Budgeted semantic gateway
+GoalInterpreter
+StrategyPlanner
+PlanCompiler
+ControlLoop
+TaskRuntime
+```
+
+플랫폼 adapter와 case adapter는 이 조립을 복제하지 않는다.
+
+### P0 완료 gate
+
+- browser fixture와 terminal fixture가 같은 `TaskRuntime`을 사용
+- `CaseRunner` raw gateway/input 직접 호출 0
+- task 전체 semantic call이 한 ledger에 기록
+- attempt가 5회여도 task budget이 증가하지 않음
+- HIGH/CRITICAL policy deny 시 모든 adapter에서 side effect 0
+- unknown command → `ACTION_UNSUPPORTED`
+- 5+ node fixture를 runtime model call 0으로 완료
+
+---
+
+## 5. P1 — semantic boundary 완전 단일화
+
+### 5.1 모든 provider 응답은 공통 framing을 사용
+
+`hpcu/gateway/json_response.py`를 공통 transport framing 계층으로 사용한다.
+
+다음 직접 파싱을 제거한다.
+
+- `SemanticSlotFiller`의 직접 `json.loads(response.content)`
+- `ModelRouter`의 regex `_parse_target`
+- runner 내부 provider-response parser
+- 새 모듈에서 임의 JSON brace regex 추가
+
+원칙:
+
+```text
+provider adapter normalization
+→ JSON candidate extraction
+→ schema-directed unique object selection
+→ typed DTO validation
+→ scene/budget/policy validation
+```
+
+transport presentation noise만 흡수하고 action-bearing field를 semantic repair하지 않는다.
+
+### 5.2 `ModelRouter`의 독립 budget/parser 제거
+
+`ModelRouter`가 유지된다면 역할을 **승격 정책 계산**으로 제한한다.
+
+- private `_model_calls_remaining` 제거
+- gateway 직접 호출 제거 또는 `SemanticInterrupt`로 위임
+- target regex fallback 제거
+- task-global ledger 공유
+- tier 선택 결과는 `SemanticRequest`/`ReplanReason`만 반환
+
+가능하면 최종적으로 `ModelRouter`를 다음 두 책임으로 분해한다.
+
+```text
+EscalationPolicy: failure + confidence + risk → semantic interrupt 필요 여부
+SemanticInterrupt: typed request → configured provider → typed response
+```
+
+### P1 완료 gate
+
+- semantic call site에서 raw `json.loads(response.content)` 0
+- semantic call site에서 provider-specific regex 0
+- 모든 model call에 purpose + triggering failure/unresolved slot 기록
+- schema ambiguity는 fail closed
+- model failure가 physical fallback click으로 바뀌는 경로 0
+
+---
+
+## 6. P2 — PlanIR을 SEARCH 예제에서 범용 계획기로 확장
+
+`GoalInterpreter`가 여러 intent를 이해해도 `PlanCompiler`가 search만 만들면 상위 방향
+설정은 실질적으로 완성되지 않는다.
+
+### 6.1 compiler public API
+
+최종 진입점은 intent별 private helper를 감싸는 하나의 compile 계약으로 수렴한다.
+
+```python
+PlanCompiler.compile(
+    goal: GoalEnvelope,
+    strategy: StrategyPlan,
+    context: PlanningContext,
+    task_budget: TaskBudgetSpec,
+) -> PlanIR
+```
+
+내부 template:
+
+- `_compile_navigate`
+- `_compile_search`
+- `_compile_select`
+- `_compile_compare`
+- `_compile_edit`
+- `_compile_submit`
+
+### 6.2 최소 node pattern
+
+#### Navigate
+
+```text
+resolve entry
+→ focus/open surface
+→ navigate
+→ verify surface identity
+```
+
+#### Search
+
+```text
+resolve search field
+→ focus
+→ replace text
+→ submit
+→ verify query echo + result candidate
+```
+
+#### Select
+
+```text
+resolve candidate set
+→ deterministic filter/rank
+→ select/click
+→ verify selected state
+```
+
+#### Compare
+
+```text
+resolve candidate A/B
+→ read structured attributes locally
+→ normalize comparable facts
+→ verify both evidence sets available
+→ return comparison state
+```
+
+비교 자체가 GUI side effect를 필요로 하지 않으면 모델 호출 없이 local read로 끝낼 수 있어야 한다.
+
+#### Edit
+
+```text
+resolve editable target
+→ capture old value
+→ replace/toggle/select
+→ verify value_changed + requested value
+```
+
+#### Submit
+
+```text
+resolve form/submit control
+→ precondition validation
+→ risk/policy approval gate
+→ submit
+→ verify independent confirmation
+```
+
+### 6.3 plan-time 모델의 제한
+
+모델이 필요한 경우에도 반환 가능한 것은 다음에 한정한다.
+
+- unresolved goal slot
+- abstract target query
+- strategy preference 후보
+- evidence requirement 보완
+
+반환 금지:
+
+- screen coordinate
+- current `element_id`
+- 임의 success claim
+- policy/risk 완화
+- raw OS command
+
+### P2 완료 gate
+
+- 6 intent 모두 deterministic fixture PlanIR 생성
+- 동일 goal/context/capability → 동일 plan hash
+- capability 없는 op가 plan에 등장하지 않음
+- uncached semantic plan compile ≤1 logical call
+- simple navigate/search는 plan compile 없이도 가능한 fixture 존재
+- 3개 intent 이상에서 4+ node end-to-end integration 통과
+
+---
+
+## 7. P3 — bounded dynamic replan
+
+현재 `TaskRuntime`은 미리 만들어진 edge만 따라간다. 범용 GUI에서는 화면 상태가
+예상과 달라질 수 있으므로 **무제한 모델 재계획이 아니라 bounded plan repair**가 필요하다.
+
+### 7.1 replan hierarchy
+
+실패 시 항상 다음 순서를 지킨다.
+
+```text
+L0 current node retry 금지 조건 검사
+↓
+L1 fresh recapture + same query local re-ground
+↓
+L2 alternate local query / local interaction mode
+↓
+L3 alternate feasible StrategyPlan
+↓
+L4 unresolved facts만 semantic interrupt
+↓
+L5 human handoff / bounded halt
+```
+
+같은 입력을 그대로 반복하는 것은 repair가 아니다.
+
+### 7.2 신규 경계
+
+권장 DTO:
 
 ```python
 @dataclass(frozen=True)
-class GoalEnvelope:
-    raw_instruction: str
-    intent: IntentKind
-    terminal_state: TerminalState
-    entities: tuple[GoalEntity, ...]
-    constraints: tuple[GoalConstraint, ...]
-    preferred_surface: SurfaceKind | None
-    forbidden_actions: tuple[ActionOp, ...]
-    risk_class: RiskClass
-    reversibility: Reversibility
-    ambiguity_slots: tuple[str, ...]
-    evidence_requirements: tuple[EvidenceRequirement, ...]
-    latency_budget_ms: int
-    model_call_budget: int
+class ReplanRequest:
+    reason: FailureCode
+    failed_node_id: str
+    scene_version: int
+    unresolved_slots: tuple[str, ...]
+    completed_nodes: tuple[str, ...]
+    remaining_budget: TaskBudgetSnapshot
+
+@dataclass(frozen=True)
+class PlanPatch:
+    parent_plan_hash: str
+    replaced_node_ids: tuple[str, ...]
+    nodes: Mapping[str, PlanNode]
+    resume_node_id: str
+    reason: FailureCode
 ```
 
 규칙:
 
-- 원문 문자열을 버리지 않는다.
-- 숫자·날짜·가격·개수·명시 앱/사이트·부정 조건은 CPU parser가 먼저 추출한다.
-- 모델은 전체 계획을 자유문으로 반환하지 않고 unresolved slot만 schema로 채운다.
-- 위험·금지 action은 모델이 완화할 수 없다.
-- 단순 navigate/search는 parser 결과만으로 plan을 만들 수 있어야 한다.
+- patch는 node boundary에서만 적용한다.
+- verified 완료 node를 삭제/재실행하지 않는다.
+- irreversible node 이후에는 그 효과를 전제로만 재계획한다.
+- `max_replans_per_task`는 config에서 제한한다.
+- 모든 patch는 parent plan hash와 reason을 trace에 남긴다.
 
-### 6.2 `CapabilitySnapshot`
+### 7.3 semantic replan의 범위
 
-권장 위치: `hpcu/schemas/capability_snapshot.py`
+모델에게 전체 화면과 전체 계획을 다시 맡기지 않는다.
 
-```python
-@dataclass(frozen=True)
-class CapabilitySnapshot:
-    active_surface: SurfaceKind
-    execution_mode: ExecutionMode
-    capture: Capability
-    structure: Capability
-    semantic_input: Capability
-    physical_input: Capability
-    ocr: Capability
-    dirty_rects: Capability
-    tool_actions: tuple[str, ...]
-    reusable_workflows: tuple[str, ...]
-    measured_latency_ms: Mapping[str, float]
-    observed_reliability: Mapping[str, float]
-```
-
-계획은 존재하지 않는 capability를 가정하지 않는다.
-`UNSUPPORTED`는 recovery가 아니라 plan 후보 제거 조건이다.
-
-### 6.3 `StrategyPlan`
-
-권장 위치: `hpcu/schemas/strategy.py`
-
-각 후보는 실행 가능성·예상 단계·증거 강도·위험·모델 비용을 가진다.
+예:
 
 ```text
-utility =
-    feasibility
-  × expected_reliability
-  × evidence_strength
-  - expected_latency
-  - model_cost
-  - risk_cost
-  - recovery_cost
+실패: search textbox 미발견
+local facts: textbox candidate 0, button 3, page role=dialog 존재
+질문: "현재 계획에서 해결되지 않은 target role / next abstract step만 반환"
 ```
 
-초기 구현은 학습 모델이 아니라 설정 기반 결정론 점수식으로 시작한다.
-동점 또는 필수 slot 미해결 때만 configured semantic provider를 호출한다.
+모델 응답이 액션 좌표나 임의 element ID를 반환하면 거부한다.
 
-### 6.4 `PlanIR`
+### P3 완료 gate
 
-권장 위치: `hpcu/schemas/plan.py`
-
-```python
-@dataclass(frozen=True)
-class PlanNode:
-    id: str
-    op: ActionOp
-    surface: SurfaceKind
-    target_query: TargetQuery | None
-    grounding_hints: GroundingHints | None
-    value: str | None
-    preconditions: tuple[Precondition, ...]
-    postconditions: tuple[Postcondition, ...]
-    evidence: EvidenceContract
-    risk: RiskClass
-    idempotency: Idempotency
-    timeout_ms: int
-    retry: RetryPolicy
-    model_gate: ModelGate
-    success_edge: str | None
-    failure_edges: Mapping[str, str]
-```
-
-```python
-@dataclass(frozen=True)
-class PlanIR:
-    goal: GoalEnvelope
-    strategy_id: str
-    entry_node_id: str
-    nodes: Mapping[str, PlanNode]
-    task_budget: TaskBudgetSpec
-    compiler_version: str
-```
-
-불변식:
-
-- plan-time 모델은 좌표·현재 `element_id`를 반환하지 않는다.
-- 모든 side effect node는 precondition·postcondition·risk를 가진다.
-- retry는 node 재실행이 아니라 명시된 failure edge를 따른다.
-- 한 PlanIR은 여러 click/type/select/scroll/tool node를 표현할 수 있다.
-- `TargetingPack`은 전역 goal 결과가 아니라 node별 `GroundingHints`로 이동한다.
-
-### 6.5 `TaskBudgetSpec` / `TaskBudgetLedger`
-
-권장 위치: `hpcu/schemas/budget.py`, `hpcu/runtime_core/task_budget.py`
-
-```python
-@dataclass(frozen=True)
-class TaskBudgetSpec:
-    max_model_calls: int
-    max_model_tokens: int
-    max_model_latency_ms: int
-```
-
-```python
-@dataclass
-class TaskBudgetLedger:
-    spec: TaskBudgetSpec
-    calls_by_purpose: dict[ModelCallPurpose, int]
-    tokens_used: int = 0
-    latency_ms: int = 0
-```
-
-- plan compile, intent fill, grounding, reanalysis, recovery를 모두 합산한다.
-- immutable limit와 mutable runtime counter를 분리한다.
-- attempt가 바뀌어도 ledger를 초기화하지 않는다.
-- gateway 외부에서 counter를 따로 만들지 않는다.
-- budget 소진은 클릭 fallback이 아니라 명시적 `MODEL_BUDGET_EXHAUSTED`다.
+- duplicate label, modal, slow loading, stale target fixture에서 bounded repair 성공/정지
+- 같은 action+same scene 3회 반복 0
+- replan 횟수 config 초과 0
+- semantic replan 후에도 task budget이 유지
+- irreversible node 중복 실행 0
+- patch lineage가 trace artifact에 남음
 
 ---
 
-## 7. 단일 실행 경로 계약
+## 8. P4 — temporal execution semantics와 실제 LoopBreaker 연결
 
-### 7.1 역할 분리
+### 8.1 `WAIT_UNTIL`은 단일 scene assert가 아니다
 
-| 모듈 | 최종 역할 |
+현재 local verify op로 즉시 평가하는 형태를 제거한다.
+
+정상 계약:
+
+```text
+deadline 시작
+→ observe
+→ predicate/evidence 평가
+→ stable poll count 충족? success
+→ 아니면 bounded wait
+→ fresh observe
+→ timeout 시 TIMEOUT/POSTCONDITION_UNMET
+```
+
+- 고정 `time.sleep` 금지
+- poll interval / stable polls / timeout은 config
+- scene version만 증가하고 content가 동일한 경우 안정 상태로 취급 가능
+- wait 중에도 access-control/policy relevant state가 나타나면 즉시 중단 가능
+
+### 8.2 LoopBreaker에 실제 history 제공
+
+`ControlLoop`/`TaskRuntime`은 bounded history를 유지한다.
+
+```text
+action fingerprint
+pre/post scene hash
+failure code
+node id
+replan id
+```
+
+`detect((), ())` 같은 빈 history 호출은 금지한다.
+
+LoopBreaker 결과는 raw input을 직접 수행하지 않고 다음 중 하나로 변환한다.
+
+- `REEXPLORE` → local re-ground
+- `SWITCH_MODE` → alternate local StrategyPlan 후보
+- `ESCALATE` → semantic interrupt request
+- `HALT` → `LOOP_DETECTED` / `RECOVERY_EXHAUSTED`
+
+### P4 완료 gate
+
+- repeated action, A-B-A, popup reappear, scroll-no-change를 실제 TaskRuntime fixture에서 탐지
+- wait-until slow-loading fixture 통과
+- timeout은 bounded stop
+- loop recovery가 raw injector를 호출하지 않음
+
+---
+
+## 9. P5 — 독립 Evidence와 단일 상태 commit
+
+### 9.1 모델 편찬 token은 evidence oracle이 아니다
+
+`TargetingPack.success_any`/`ready_any`는 grounding 및 관찰 힌트로 사용할 수 있지만,
+그 token을 만든 모델이 같은 token 존재 여부로 성공을 단독 확정하게 하지 않는다.
+
+intent별 최소 evidence:
+
+| intent | 최소 evidence |
 |---|---|
-| `GoalInterpreter` | 자연어 → `GoalEnvelope` |
-| `StrategyPlanner` | capability/context/workflow를 보고 전략 선택 |
-| `PlanCompiler` | 전략 → typed `PlanIR` |
-| `TaskRuntime` | PlanIR node 상태·edge·budget 관리 |
-| `ControlLoop.step()` | 단일 node의 observe→ground→policy→execute→fresh observe→verify |
-| `CaseRunner` | fixture 입력·통계·아티팩트 adapter |
-| `ModelRouter` | `SemanticInterrupt` 한 경계로 흡수 또는 제거 |
-| `TargetingCompiler` | node-level `GroundingHints` 편찬기로 축소 |
+| navigate | surface identity 또는 URL/title/content의 강한 typed signal |
+| search | query echo + result candidate |
+| select | selected/toggled/active state 변화 |
+| compare | 서로 다른 두 candidate의 독립 attribute evidence |
+| edit | old value ≠ new value + requested value observable |
+| submit | submission confirmation 또는 독립 외부 효과 |
 
-다음은 금지한다.
+### 9.2 task terminal state는 한 곳에서만 commit
 
-- `CaseRunner` 내부에서 gateway 직접 호출
-- runner/recovery/plugin에서 raw injector 직접 호출
-- 경로별 별도 success state machine
-- 경로별 별도 모델 budget
-- unknown action을 click으로 변환
-- action 전 scene으로 postcondition 평가
-
-### 7.2 action freshness
-
-`PreparedAction`에는 최소 다음 binding을 넣는다.
-
-```python
-@dataclass(frozen=True)
-class PreparedAction:
-    action: Action
-    element_id: str | None
-    source_scene_version: int
-    source_frame_id: str | None
-    target_fingerprint: str | None
-    target_bbox: BoundingBox | None
-```
-
-실행 직전 현재 scene version 또는 target fingerprint가 달라지면 실행하지 않는다.
-고정 좌표는 binding의 결과일 뿐 재사용 가능한 selector가 아니다.
-
-### 7.3 transition verification
+`TaskRuntime` 또는 별도 순수 state transition 함수만 다음을 결정한다.
 
 ```text
-pre_scene
-→ policy/stale gate
-→ execute
-→ post_scene = fresh observe()
-→ SceneDelta(pre, post)
-→ verifier.verify_transition(pre_scene, action, post_scene)
-→ success state commit
+RUNNING
+VERIFIED_SUCCESS
+HUMAN_HANDOFF
+FAILED
 ```
 
-성공 조건:
+runner/model/verifier가 각자 `success=True`를 직접 세팅하지 않는다.
 
-- action의 low-level `ExecutionResult.success`만으로 완료하지 않는다.
-- 모델 `goal_state=success`만으로 완료하지 않는다.
-- `bool(scene_blob)`를 증거로 사용하지 않는다.
-- 성공 시 이전 attempt의 `failure_code`·`failure`를 명시적으로 clear한다.
-- reanalysis가 `unknown`, `in_progress`, `failed`, `human_handoff`이면 성공 경로로 통과하지 않는다.
-- navigation/no-op 목표도 URL·title·content·state 중 최소 두 독립 신호 또는
-  하나의 강한 typed signal을 요구한다.
+성공 commit 시:
+
+- failure/failure_code clear
+- final scene/frame/evidence binding 저장
+- terminal evidence ids 저장
+- model claim과 independent evidence 구분 기록
+
+### P5 완료 gate
+
+- no-op injector false success 0
+- previous-scene-only evidence false success 0
+- 모델 `goal_state=success` 단독 성공 0
+- empty scene/blob truthiness 성공 0
+- success row에 failure code 잔류 0
 
 ---
 
-## 8. CPU-first hot path
+## 10. P6 — CPU-first hot path를 실제 observer에 연결
 
-CPU-first는 “매 frame 전체 OCR”이 아니라 **변화량을 최소 비용으로 좁히는 것**이다.
+Correctness(P0~P5)가 닫힌 뒤 최적화한다.
 
-### 8.1 capture와 frame lifetime
-
-- `FrameStore`에 bounded capacity와 eviction을 추가한다.
-- 실제 shared memory를 쓰지 않는 구현이면 `shm_id`라는 이름으로 무복사를 주장하지 않는다.
-- capture backend가 PNG를 제공해도 perception 내부에서 반복 decode→crop→encode하지 않도록
-  decoded frame/cache 또는 raw buffer 계약을 추가한다.
-- frame handle·store lifetime을 trace와 분리한다.
-
-### 8.2 dirty ROI 연결
-
-실제 hot path:
+### 10.1 target hot path
 
 ```text
 capture
 → backend dirty rect 또는 tile hash
-→ unchanged: 이전 Scene 재사용
+→ unchanged: previous Scene reuse
 → changed ROI만 perception
-→ structure delta와 fusion
-→ stable id remap
+→ structure delta fusion
+→ stable identity remap
 → SceneDelta
+→ grounding
 ```
 
-- `hpcu/capture/tile_hash.py`와 ring buffer를 `CompositeObserver`에 실제 연결한다.
-- ROI dense OCR → 필요 ROI에만 sparse OCR; full-screen 재시도는 budgeted fallback이다.
-- 처리 pixel 수와 OCR pass 수를 benchmark에 기록한다.
+### 10.2 구현 항목
 
-### 8.3 stable element identity
+- ring buffer/tile hash를 `CompositeObserver` 실제 path에 연결
+- unchanged frame full OCR 0
+- decoded frame / crop cache
+- ROI dense OCR → 필요 ROI sparse OCR
+- full-screen OCR는 budgeted fallback
+- equality diff에서 transient scene_version/first_seen/last_seen 제외
+- OCR stable ID: fingerprint → IoU + text + role + source ensemble
+- `ocr_line_N` 순번을 persistent identity로 사용하지 않음
+- source-aware confidence calibration
+- generic numeric/text/geometry feature만 perception에서 생성
 
-- equality diff에서 `scene_version`, first/last seen 같은 transient field를 제외한다.
-- fingerprint가 없으면 IoU + text/role/source ensemble로 remap한다.
-- `ocr_line_N` 순번을 안정 ID로 간주하지 않는다.
-- 동일 화면에서 unchanged element가 매 frame modified가 되는 회귀 테스트를 추가한다.
+### P6 완료 gate
 
-### 8.4 generic perception
-
-가격·통화 패턴은 중립적인 `numeric_amount` feature로 추출할 수 있으나,
-공통 perception이 임의로 `role="product"`를 확정하지 않는다.
-
-- OCR는 text·bbox·confidence·generic feature를 만든다.
-- “상품”, “성공”, “결제 버튼” 같은 goal 의미는 node grounding hint 또는
-  structure role과 결합해 결정한다.
-- source별 confidence ceiling을 실측하고 threshold를 source-aware하게 보정한다.
-- OCR 후보가 이론상 local threshold를 넘을 수 없는 설정을 금지하는 테스트를 둔다.
+- unchanged 1080p frame p95 ≤ 10ms (reference hardware 기록)
+- delta scene update p95 ≤ 150ms
+- unchanged frame OCR pass 0
+- 100-frame stable ID 유지율 artifact
+- processed pixel / OCR pass / CPU time / peak RSS 기록
 
 ---
 
-## 9. Workflow compiler의 승격 기준
+## 11. P7 — verified Workflow와 0-call replay
 
 workflow는 action log 복사가 아니라 **검증된 state transition의 재사용 프로그램**이다.
 
 승격 입력:
 
-- `GoalEnvelope`
-- 선택된 `StrategyPlan`
-- 실행된 `PlanIR`
-- 각 node의 pre/post scene fingerprint
-- 실제 selector ensemble
-- independent evidence result
+- GoalEnvelope
+- StrategyPlan
+- PlanIR + plan patch lineage
+- node별 pre/post scene fingerprint
+- selector ensemble
+- independent EvidenceState
 - recovery edge
-- capability·execution mode·environment fingerprint
+- capability/execution mode/environment fingerprint
 
-승격 단계:
+qualification:
 
-1. 한 번 성공: trace candidate
-2. 동일 goal family 반복 성공: experimental workflow
-3. 다른 세션·viewport·theme·locale에서 shadow replay 통과: qualified
-4. 실제 replay에서 fresh verification 통과: active
-5. drift 또는 false completion: 즉시 downgrade
+```text
+verified trace candidate
+→ repeated success
+→ experimental workflow
+→ multi-session offline shadow replay
+→ qualified
+→ online fresh verification replay
+→ active
+```
 
-`ShadowReplayEngine`은 element ID 문자열만 비교하지 않는다.
-같은 `TaskRuntime`·Grounder·Verifier를 offline scene stream에 실행한다.
+같은 `TaskRuntime`, `Grounder`, `Verifier`를 offline scene stream에서도 사용한다.
+
+### P7 완료 gate
+
+- 첫 verified run → 동일 fixture replay model 0
+- viewport/locale/text drift에서 re-ground 또는 halt
+- fixed coordinate replay 0
+- failed trajectory 승격 0
+- drift/false completion 발생 시 즉시 downgrade
 
 ---
 
-## 10. 작업 묶음 — 순서 강제
+## 12. P8 — held-out 제품 자격 게이트
 
-한 묶음의 완료 조건이 자동 테스트와 아티팩트로 닫히기 전에 다음 묶음으로 가지 않는다.
-새 feature·새 사이트 케이스 추가보다 U1~U6을 우선한다.
+unit count가 아니라 일반화·안전·성능을 릴리스 기준으로 사용한다.
 
-### U1 — 경계 결정·기준선·태스크 정직화
-
-**목표:** 무엇을 제품 성공이라 부를지 먼저 고정한다.
-
-변경:
-
-- `screen_strict` / `local_semantic` 실행 모드 ADR 작성
-- 현재 `main`의 false-success·모델 latency·physical input 기준선 저장
-- 기존 tasklist `[x]`를 component existence와 product qualification으로 분리
-- `action_count`를 input/event/observe/model/verify로 분리할 스키마 확정
-- held-out spec에서 완성 `start_url`을 정답으로 제공하지 않는 규칙 추가
-
-완료 조건:
-
-- 같은 commit/config에서 재현 가능한 baseline JSON
-- success인데 `failure_code`가 남는 fixture가 실패
-- `tests/integration`, `tests/replay`가 빈 디렉터리가 아님
-- 문서 소유 관계가 00·01·06·07·09·11·14와 충돌하지 않음
-
-### U2 — `GoalEnvelope`와 최소 semantic fill
-
-**목표:** 사용자 명령에서 방향 설정에 필요한 구조를 먼저 만든다.
-
-변경:
-
-- `hpcu/schemas/goal.py`
-- `hpcu/planning/goal_interpreter.py`
-- CPU parser: 숫자·날짜·가격·개수·명시 surface·부정·위험 표현
-- unresolved slot만 configured semantic provider가 채우는 strict schema
-- 같은 goal의 canonical hash와 cache
-
-완료 조건:
-
-- navigate/search/select/compare/edit/submit 최소 6 intent fixture
-- 모델 없이 구조화 가능한 명령은 model call 0
-- provider 오류 시 임의 intent로 추측하지 않고 unresolved 반환
-- 위험·forbidden field를 모델 응답이 완화하지 못함
-
-### U3 — Capability-aware `StrategyPlan`과 typed `PlanIR`
-
-**목표:** 하나의 `pick_query`가 아니라 다단계 실행 프로그램을 만든다.
-
-변경:
-
-- `CapabilitySnapshot`, `StrategyCandidate`, `StrategyPlan`
-- `PlanNode`, `PlanIR`, JSON schema
-- workflow cache 우선, deterministic strategy score
-- `TargetingPack` compatibility adapter → node `GroundingHints`
-- plan-time 모델 응답에서 좌표·현재 element ID 거부
-
-완료 조건:
-
-- search box focus → type → submit → result verify의 4-node PlanIR
-- existing-screen, URL entry, terminal command 전략을 동일 PlanIR로 표현
-- capability가 없는 전략은 선택되지 않음
-- 동일 입력·동일 context에서 PlanIR hash가 결정론적
-- plan compile 호출은 uncached task당 최대 1회
-
-### U4 — `TaskRuntime` + 단일 `ControlLoop`
-
-**목표:** 실제 제품 경로를 하나로 만든다.
-
-변경:
-
-- `TaskRuntime`은 PlanIR node/edge/status만 관리
-- `ControlLoop.step(node)`가 유일한 action cycle
-- `CaseRunner`의 gateway/input/policy/verification/retry 로직 제거
-- `ModelRouter`와 runner semantic decision을 `SemanticInterrupt`로 통합
-- 모든 navigation·recovery·tool action도 Action DSL 경유
-
-완료 조건:
-
-- `CaseRunner`가 raw gateway·injector를 import하지 않음
-- browser·terminal fixture가 같은 `TaskRuntime`을 사용
-- 5개 이상 node 작업이 model runtime call 0으로 실행
-- policy HIGH면 어떤 adapter 경로에서도 side effect 0
-- unknown command가 `ACTION_UNSUPPORTED`로 fail closed
-
-### U5 — fresh verification·stale binding·상태 정규화
-
-**목표:** false-success 경로를 구조적으로 제거한다.
-
-변경:
-
-- `PreparedAction` scene/frame/fingerprint binding
-- action 후 fresh observe 강제
-- `Verifier.verify_transition(pre, action, post)`
-- typed navigation/search/select/edit evidence
-- success/failure state transition 한 곳
-- lexical token은 evidence 보조 신호로만 사용
-
-완료 조건:
-
-- no-op injector는 성공하지 못함
-- 이전 scene에만 존재하는 postcondition은 실패
-- action 사이 화면 변화 시 stale rejection 100%
-- `bool(scene_blob)`·모델 success 문장만으로 완료 0건
-- success row의 failure code는 항상 empty
-- false-success failure injection suite 통과
-
-### U6 — 전역 `TaskBudget`과 model-last 정책
-
-**목표:** 모델 호출을 task 전체에서 통제하고 호출 이유를 설명 가능하게 만든다.
-
-변경:
-
-- compile/intent/ground/reanalysis/recovery 공통 budget
-- attempt별 counter reset 제거
-- purpose별 token·latency·error 기록
-- 동일 scene에서 schema 오류만 이유로 무의미하게 재질문하지 않음
-- plan/cache/local grounding/semantic interrupt 순서 고정
-
-완료 조건:
-
-- budget 초과 호출 0
-- simple navigate/search runtime grounding call 0
-- compiled replay total model call 0
-- 모델 실패 시 임의 lexical click 0
-- 모든 model call에 triggering failure code와 unresolved slot 기록
-
-### U7 — 실제 증분 CPU perception
-
-**목표:** 전체 OCR 반복을 dirty ROI pipeline으로 교체한다.
-
-변경:
-
-- bounded `FrameStore`
-- ring buffer·tile hash·dirty rect 연결
-- decoded frame/crop cache
-- stable OCR ID와 semantic diff
-- source-aware confidence calibration
-- generic feature extraction; shopping role 제거
-
-완료 조건:
-
-- unchanged 1080p frame 처리 p95 ≤ 10ms — reference hardware 기록
-- delta scene update p95 ≤ 150ms
-- unchanged frame OCR pass 0
-- 변경 pixel 비율·OCR pass·CPU time·peak RSS 기록
-- 동일 화면 100 frame에서 stable element ID 유지율 측정
-- OCR-only exact target의 local path가 설정상 도달 가능
-
-### U8 — verified workflow compile과 실제 replay
-
-**목표:** 성공 경험을 0-call 재사용 프로그램으로 승격한다.
-
-변경:
-
-- verified transition 기반 parameterization
-- selector ensemble·node evidence·recovery edge 저장
-- offline scene stream에 `TaskRuntime` shadow replay
-- multi-session qualification, drift downgrade
-- workflow artifact에 compiler/config/schema version 기록
-
-완료 조건:
-
-- 첫 실행 verified success 후 동일 fixture replay model 0
-- viewport/text drift에서 재탐색 또는 halt, 고정 좌표 재생 0
-- 실패 trajectory 승격 0
-- shadow replay가 element ID 문자열 비교만 하지 않음
-- workflow qualification 결과가 독립 artifact로 남음
-
-### U9 — held-out 제품 자격 게이트
-
-**목표:** unit count가 아닌 실제 일반화·성능·안전을 릴리스 기준으로 만든다.
-
-초기 benchmark 구성:
+초기 dataset:
 
 - 30개 이상 held-out task
-- intent family 5개 이상
-- surface 3개 이상
+- intent family 6개
+- browser/terminal/desktop 최소 3 surface
 - 절반 이상 3 node 이상
-- 중복 label, popup, 느린 로딩, stale frame, 다른 locale/viewport 포함
-- test spec에 최종 URL·정답 element ID·성공 문자열 직접 제공 금지
+- duplicate label, modal, slow loading, stale frame 포함
+- locale/viewport/theme 변화 포함
+- case spec에 최종 URL, 정답 element ID, 성공 문자열 직접 제공 금지
 
-초기 합격 기준:
+합격 기준:
 
 - false completion 0
-- stale action 실행 0
+- stale action execution 0
 - policy bypass 0
-- access-control 우회 0
+- access-control bypass 0
+- simple navigate/search runtime model call 0
+- uncached semantic plan compile ≤1 logical call
 - compiled replay model call 0
-- simple navigate/search의 runtime model call 0
-- uncached task plan compile ≤1
-- 모델 latency / total latency를 cached·uncached로 분리 보고
-- physical/semantic/tool input과 trace event를 분리 보고
-- 실패 케이스는 5회 이내 bounded stop + 증거 artifact
+- task budget 초과 semantic call 0
+- bounded failure stop ≤5 repair/replan cycles
+- 모든 실패에 final scene + failure reason + trace artifact 존재
 
 ---
 
-## 11. 테스트 구조
+## 13. 권장 PR 순서
+
+각 PR은 이전 PR의 자동 gate가 통과하기 전 merge하지 않는다.
+
+### PR-A — semantic/budget 단일 경계
+
+- `SemanticSlotFiller` 공통 JSON parser 사용
+- `ModelRouter` private parser/budget 제거
+- one task / one `TaskBudgetLedger`
+- logical vs transport retry regression
+
+### PR-B — CaseRunner → TaskRuntime 수렴
+
+- CaseRunner를 test adapter로 축소
+- navigation 포함 모든 input을 Action DSL로 이동
+- 제품 composition root 하나
+- dual success/retry state machine 제거
+
+**이 PR은 장기간 분할하지 않는다. dual-path 기간을 최소화한다.**
+
+### PR-C — 범용 PlanCompiler
+
+- navigate/select/compare/edit/submit compiler
+- PlanningContext/CapabilitySnapshot 연결
+- deterministic plan hash
+
+### PR-D — bounded local repair + replan
+
+- ReplanRequest/PlanPatch
+- local repair hierarchy
+- irreversible progress 보존
+- replan lineage trace
+
+### PR-E — temporal wait + LoopBreaker
+
+- real history
+- wait_until/settle temporal semantics
+- recovery → replan/edge 연결
+
+### PR-F — typed evidence + terminal commit
+
+- intent별 EvidenceContract
+- success state 단일화
+- legacy token-only success 제거
+
+### PR-G — dirty ROI hot path
+
+- tile hash/ring buffer/ROI OCR/stable IDs
+- CPU performance metrics
+
+### PR-H — verified workflow + held-out qualification
+
+- offline same-runtime replay
+- multi-session qualification
+- 30+ held-out gate
+
+---
+
+## 14. 테스트 전략
 
 ### Unit
 
-- DTO invariant
-- local goal parser
-- strategy score
-- PlanIR validation
+- GoalEnvelope invariant / CPU parser
+- semantic schema-directed parser
 - budget monotonicity
-- source-aware confidence
-- unknown action rejection
+- strategy feasibility/score
+- PlanIR validation/hash
+- PlanPatch invariant
+- irreversible node protection
+- temporal wait predicate
 - state transition normalization
 
 ### Integration
 
-- `GoalEnvelope → PlanIR → TaskRuntime → ControlLoop → Verifier`
-- browser fixture multi-step
-- terminal fixture multi-step
-- policy gate와 adapter 경계
-- model timeout/schema error
-- action 후 fresh scene
+- `UserCommand → GoalEnvelope → StrategyPlan → PlanIR → TaskRuntime → ControlLoop → Verifier`
+- browser search 4+ node
+- terminal multi-step
+- select/edit/submit
+- policy deny
+- stale after ground
+- semantic timeout/schema failure
+- dynamic modal + replan
 
 ### Replay
 
-- stored scene stream에 같은 runtime 실행
+- stored scene delta stream에 같은 runtime 실행
 - selector drift
-- locale/viewport 변화
-- workflow qualification/downgrade
-- model call 0 확인
+- viewport/locale 변화
+- loop/replan lineage
+- model call 0 workflow replay
 
 ### Failure injection
 
-- stale after ground
 - no-op input
-- frame unchanged
+- stale target
+- unchanged frame
 - malformed command
 - false success token
 - budget exhaustion
 - partial action failure
 - popup loop
+- scroll no change
 - access-control screen
+- conflicting semantic JSON objects
 
 ### E2E
 
-- 실 provider 검증은 unit pass로 대체하지 않는다.
-- provider/network 실패는 환경 실패 또는 model failure로 기록한다.
-- 실제 X11/Browser/Windows 결과는 commit/config/provider identity를 포함한다.
+- real provider 결과는 unit으로 대체하지 않는다.
+- provider/network failure와 code failure를 분리한다.
+- commit/config/provider/model/case hash를 manifest에 기록한다.
 
 ---
 
-## 12. 지표 스키마
+## 15. 관측 지표
 
-`CaseStats.action_count` 하나로 여러 현상을 합치지 않는다.
+`action_count` 하나로 여러 현상을 합치지 않는다.
 
 ```text
 trace_event_count
@@ -704,6 +797,8 @@ semantic_input_count
 physical_input_count
 tool_action_count
 verification_count
+local_repair_count
+replan_count
 recovery_count
 model_call_count
 model_tokens
@@ -715,76 +810,77 @@ stale_rejection_count
 false_completion_count
 ```
 
-모든 benchmark artifact에 다음 fingerprint를 넣는다.
+모든 benchmark artifact fingerprint:
 
 - commit SHA
 - runtime config hash
-- schema/compiler version
+- Goal/Plan schema version
+- compiler version
 - provider/model identity
-- OS·CPU·RAM·resolution·scaling
+- OS/CPU/RAM/resolution/scaling
 - case dataset version
 - execution mode
 
 ---
 
-## 13. 마이그레이션 원칙
+## 16. 마이그레이션 규칙
 
-1. U2~U3은 기존 runner를 건드리기 전에 schema와 fake tests로 닫는다.
-2. U4에서 새 loop를 하나 더 만들지 않는다. 기존 `ControlLoop`를 유일 경로로 승격한다.
-3. `CaseRunner`는 한 PR에서 test adapter로 축소한다. 장기간 dual-path를 유지하지 않는다.
-4. U5가 끝나기 전에는 `verified_success`를 제품 지표로 사용하지 않는다.
-5. U6가 끝나기 전에는 calls/task 절감 주장을 하지 않는다.
-6. U7 최적화는 U4~U5 correctness gate 뒤에 한다. 빠른 오답을 먼저 만들지 않는다.
-7. U8 workflow 승격은 verified transition만 입력으로 받는다.
-8. 기존 API는 compatibility alias를 둘 수 있으나 새 코드가 legacy path를 import하면 CI가 실패한다.
-
----
-
-## 14. 문서 동기화
-
-각 구현 묶음에서 다음 소유 문서를 함께 갱신한다.
-
-| 변경 | 소유 문서 |
-|---|---|
-| execution mode와 module map | 01·03, 이유는 새 ADR |
-| GoalEnvelope·PlanIR 경계 | 02와 본 계획 |
-| model tier·global budget | 06·08 |
-| single loop·fresh verification·stale binding | 07 |
-| workflow qualification | 09 |
-| policy gate·forbidden action | 10 |
-| 지표·held-out gate | 11 |
-| TargetingPack → node GroundingHints | 14 |
-| 진행 체크 | tasklist |
-| 짧은 불변식 변경이 필요한 경우 | AGENTS.md |
-
-기존 문서에 같은 표를 복사하지 않는다. 본 계획은 **개선 순서**, 각 소유 문서는
-**최종 계약**만 가진다.
+1. 새 runner/control loop를 만들지 않는다.
+2. legacy `CaseRunner` 기능은 새 runtime에 복사하지 않고 제거하면서 옮긴다.
+3. P0~P5 correctness 전에는 CPU 성능 최적화를 성공으로 홍보하지 않는다.
+4. semantic retry와 task replan을 같은 것으로 취급하지 않는다.
+5. transport retry는 같은 logical call이다.
+6. replan은 verified node를 되돌리지 않는다.
+7. 모델이 만든 token은 grounding hint이지 독립 success oracle이 아니다.
+8. 모든 threshold/timeout/replan limit는 config에서 읽는다.
+9. compatibility alias는 허용하되 새 제품 코드가 legacy path를 import하면 CI를 실패시킨다.
+10. tasklist `[x]`는 unit 존재가 아니라 integration/replay/held-out artifact가 증명할 때만 사용한다.
 
 ---
 
-## 15. 비목표
+## 17. 즉시 실행 우선순위
 
-- 사이트별 adapter·CTA·광고·CAPTCHA 문자열 사전 추가
-- 모델이 좌표 또는 plan-time element ID를 직접 선택
-- 최종 URL을 case spec에 넣어 계획을 우회
-- 단위 테스트 수를 제품 성공률로 홍보
-- U4 전에 또 다른 runner/control loop 추가
-- 검증 없이 workflow 자동 승격
-- 보안 확인·로그인·CAPTCHA 우회
-- 모든 OS native adapter를 본 계획에서 동시에 완성
+현재 `main`에서 바로 시작할 순서는 다음과 같다.
+
+### Priority 0
+
+1. `CaseRunner`의 `_case_model_calls` attempt reset 제거가 아니라 **CaseRunner semantic loop 자체 제거**
+2. 모든 semantic call을 하나의 `BudgetedGateway`/schema parsing boundary로 통합
+3. CaseRunner → TaskRuntime 단일 제품 경로 전환
+
+### Priority 1
+
+4. `PlanCompiler`의 6 intent 지원
+5. bounded dynamic replan
+6. `WAIT_UNTIL` temporal semantics
+7. LoopBreaker real history 연결
+8. typed terminal evidence + single state commit
+
+### Priority 2
+
+9. dirty ROI / stable OCR identity hot path
+10. verified workflow compile / offline same-runtime replay
+11. held-out 30+ qualification gate
+
+우선순위의 핵심은 **새 기능보다 경로 단일화**다.
+현재 가장 큰 리스크는 기능 부족 자체가 아니라 동일 프로젝트 안에서 서로 다른
+budget·verification·recovery 규칙을 가진 두 실행 경로가 공존하는 것이다.
 
 ---
 
-## 16. 계획 완료 정의
+## 18. 완료 정의
 
-U1~U9 완료는 다음을 모두 만족할 때만 선언한다.
+본 계획은 아래가 모두 자동 검증될 때만 완료다.
 
-1. 사용자 명령이 `GoalEnvelope → StrategyPlan → PlanIR`로 구조화된다.
-2. 모든 제품·case·replay 경로가 하나의 `TaskRuntime/ControlLoop`를 사용한다.
-3. 모든 side effect가 policy와 stale gate를 통과한다.
-4. 모든 action 성공은 fresh post-scene 또는 독립 외부 효과로 검증된다.
-5. 모델 호출은 task-global budget에 포함되고 unresolved 지점에서만 발생한다.
-6. unchanged frame은 full OCR 없이 처리된다.
-7. verified trajectory가 다음 실행에서 모델 0회로 replay된다.
-8. held-out benchmark에서 false completion·stale action·policy bypass가 0이다.
-9. tasklist `[x]`는 위 자동 gate와 artifact로 증명된다.
+1. 모든 product/case/replay 실행이 동일 `TaskRuntime/ControlLoop`를 사용한다.
+2. 사용자 명령이 `GoalEnvelope → StrategyPlan → PlanIR`로 구조화된다.
+3. 6 core intent가 동일 runtime에서 다단계로 실행된다.
+4. 모든 side effect가 policy + stale gate를 통과한다.
+5. 모든 side effect 후 fresh scene 또는 독립 외부 효과로 검증된다.
+6. 모든 semantic call이 하나의 task-global ledger와 schema parser를 사용한다.
+7. local repair 후에만 bounded semantic replan이 발생한다.
+8. same action/same scene 무한 반복이 자동 차단된다.
+9. unchanged frame은 full OCR 없이 처리된다.
+10. verified workflow는 다음 실행에서 모델 0회로 replay된다.
+11. held-out benchmark에서 false completion·stale execution·policy bypass가 0이다.
+12. 각 실패는 bounded stop과 재현 가능한 trace/manifest를 남긴다.
