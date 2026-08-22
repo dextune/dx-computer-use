@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from hpcu.gateway.gateway import Gateway, ModelCallPurpose
+from hpcu.gateway.json_response import select_json_object
 from hpcu.schemas.goal import GoalEnvelope, IntentKind
 from hpcu.schemas.surface import SurfaceKind
 
@@ -13,7 +14,8 @@ class SemanticSlotFiller:
     """Ask the configured gateway only for explicitly unresolved goal fields.
 
     The returned object is intentionally tiny: no actions, coordinates,
-    selectors, risk overrides or completion claims are accepted here.
+    selectors, risk overrides or completion claims are accepted here. Provider
+    presentation noise is handled only by the shared JSON framing boundary.
     """
 
     def __init__(self, gateway: Gateway, *, max_tokens: int = 256):
@@ -41,9 +43,9 @@ class SemanticSlotFiller:
                     if item not in (SurfaceKind.UNKNOWN, SurfaceKind.CHALLENGE)
                 ],
                 "contract": (
-                    "Return exactly one JSON object. Use only unresolved_slots as "
-                    "keys and string values. Do not return actions, selectors, "
-                    "coordinates, risk or success claims."
+                    "Return exactly one JSON object. Use every unresolved slot "
+                    "exactly once as a key with a string value. Do not return "
+                    "actions, selectors, coordinates, risk or success claims."
                 ),
             },
             ensure_ascii=False,
@@ -58,21 +60,16 @@ class SemanticSlotFiller:
             max_tokens=self._max_tokens,
             purpose=ModelCallPurpose.INTENT_FILL,
         )
-        try:
-            parsed = json.loads(response.content)
-        except json.JSONDecodeError as exc:
-            raise ValueError("semantic slot fill must be one JSON object") from exc
-        if not isinstance(parsed, dict):
-            raise ValueError("semantic slot fill must be a JSON object")
-        unknown = set(parsed) - set(allowed)
-        if unknown:
-            raise ValueError(
-                "semantic slot fill returned protected fields: "
-                f"{sorted(unknown)!r}"
-            )
+        parsed = select_json_object(
+            response.content,
+            required_keys=allowed,
+            allowed_keys=allowed,
+            schema_name="semantic slot fill",
+        )
         values: dict[str, str] = {}
-        for key, value in parsed.items():
+        for key in allowed:
+            value = parsed[key]
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"semantic slot {key!r} must be a non-empty string")
-            values[str(key)] = value.strip()
+            values[key] = value.strip()
         return values
