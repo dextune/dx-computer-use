@@ -8,7 +8,12 @@ from hpcu.runtime_core.product_runtime import (
     UnresolvedGoalError,
 )
 from hpcu.runtime_core.task_budget import BudgetedGateway, TaskBudgetLedger
-from hpcu.runtime_core.task_runtime import TaskRunResult, TaskRuntime, TaskStatus
+from hpcu.runtime_core.task_runtime import (
+    EvidenceBinding,
+    TaskRunResult,
+    TaskRuntime,
+    TaskStatus,
+)
 
 __all__ = [
     "BudgetedGateway",
@@ -16,6 +21,7 @@ __all__ = [
     "CommandRunResult",
     "CommandRuntime",
     "ControlLoop",
+    "EvidenceBinding",
     "StepResult",
     "TaskBudgetLedger",
     "TaskRunResult",
