@@ -128,7 +128,6 @@ class TaskRuntime:
         last: StepResult | None = None
         completed: list[str] = []
         completed_set: set[str] = set()
-        evidence_ids: list[str] = []
         failure_signatures: set[tuple[str, str, str]] = set()
         local_repairs: dict[str, int] = {}
         replan_count = 0
@@ -136,9 +135,20 @@ class TaskRuntime:
         for step_number in range(1, limit + 1):
             node = current_plan.nodes[node_id]
             last = await self._run_node(node)
-            self._collect_evidence(last, evidence_ids)
+            step_evidence = self._step_evidence(last) if last.success else ()
 
             if last.success:
+                if node.success_edge is None and node.evidence_requirements and not step_evidence:
+                    return self._commit_terminal(
+                        status=TaskStatus.FAILED,
+                        node_id=node_id,
+                        steps=step_number,
+                        last_step=last,
+                        failure_code=FailureCode.VERIFICATION_FAILED.value,
+                        completed=completed,
+                        evidence_ids=(),
+                        plan=current_plan,
+                    )
                 if node_id not in completed_set:
                     completed.append(node_id)
                     completed_set.add(node_id)
@@ -150,13 +160,47 @@ class TaskRuntime:
                         last_step=last,
                         failure_code=None,
                         completed=completed,
-                        evidence_ids=evidence_ids,
+                        evidence_ids=step_evidence,
                         plan=current_plan,
                     )
                 node_id = node.success_edge
                 continue
 
             failure = self._failure_code(last.failure_code)
+            if failure in _HANDOFF_FAILURES:
+                return self._commit_terminal(
+                    status=TaskStatus.HUMAN_HANDOFF,
+                    node_id=node_id,
+                    steps=step_number,
+                    last_step=last,
+                    failure_code=failure.value,
+                    completed=completed,
+                    evidence_ids=(),
+                    plan=current_plan,
+                )
+            if last.recovery_action is RecoveryAction.HALT:
+                return self._commit_terminal(
+                    status=TaskStatus.FAILED,
+                    node_id=node_id,
+                    steps=step_number,
+                    last_step=last,
+                    failure_code=FailureCode.LOOP_DETECTED.value,
+                    completed=completed,
+                    evidence_ids=(),
+                    plan=current_plan,
+                )
+            if self._irreversible_effect_is_uncertain(node, last):
+                return self._commit_terminal(
+                    status=TaskStatus.HUMAN_HANDOFF,
+                    node_id=node_id,
+                    steps=step_number,
+                    last_step=last,
+                    failure_code=failure.value,
+                    completed=completed,
+                    evidence_ids=(),
+                    plan=current_plan,
+                )
+
             signature = (
                 node_id,
                 action_fingerprint(node.action),
@@ -191,6 +235,7 @@ class TaskRuntime:
                 )
                 local_repairs[node_id] = local_count + 1
                 if patch is not None:
+                    self._validate_patch_reason(patch, request)
                     current_plan = self._apply_patch(
                         current_plan, patch, completed
                     )
@@ -220,6 +265,7 @@ class TaskRuntime:
                 )
                 replan_count += 1
                 if patch is not None:
+                    self._validate_patch_reason(patch, request)
                     current_plan = self._apply_patch(
                         current_plan, patch, completed
                     )
@@ -227,7 +273,7 @@ class TaskRuntime:
                     self._record_patch(last, patch, semantic=True)
                     continue
 
-            if failure in _HANDOFF_FAILURES or last.recovery_action is RecoveryAction.ESCALATE:
+            if last.recovery_action is RecoveryAction.ESCALATE:
                 return self._commit_terminal(
                     status=TaskStatus.HUMAN_HANDOFF,
                     node_id=node_id,
@@ -235,7 +281,7 @@ class TaskRuntime:
                     last_step=last,
                     failure_code=failure.value,
                     completed=completed,
-                    evidence_ids=evidence_ids,
+                    evidence_ids=(),
                     plan=current_plan,
                 )
 
@@ -247,11 +293,10 @@ class TaskRuntime:
                 failure_code=(
                     FailureCode.LOOP_DETECTED.value
                     if repeated_failure
-                    or last.recovery_action is RecoveryAction.HALT
                     else failure.value
                 ),
                 completed=completed,
-                evidence_ids=evidence_ids,
+                evidence_ids=(),
                 plan=current_plan,
             )
 
@@ -262,7 +307,7 @@ class TaskRuntime:
             last_step=last,
             failure_code=FailureCode.LOOP_DETECTED.value,
             completed=completed,
-            evidence_ids=evidence_ids,
+            evidence_ids=(),
             plan=current_plan,
         )
 
@@ -320,6 +365,14 @@ class TaskRuntime:
         return result
 
     @staticmethod
+    def _validate_patch_reason(
+        patch: PlanPatch,
+        request: ReplanRequest,
+    ) -> None:
+        if patch.reason is not request.reason:
+            raise ValueError("plan patch reason does not match the replan request")
+
+    @staticmethod
     def _apply_patch(
         plan: PlanIR,
         patch: PlanPatch,
@@ -353,12 +406,29 @@ class TaskRuntime:
         )
 
     @staticmethod
-    def _collect_evidence(step: StepResult, target: list[str]) -> None:
+    def _step_evidence(step: StepResult) -> tuple[str, ...]:
+        evidence: list[str] = []
         for grounding in (step.grounding, step.verification_grounding):
             if grounding is None or not grounding.confident:
                 continue
-            if grounding.element_id not in target:
-                target.append(grounding.element_id)
+            element_id = grounding.element_id
+            element = step.scene.get(element_id) if element_id else None
+            if element is None or element.scene_version != step.scene.version:
+                continue
+            if element_id not in evidence:
+                evidence.append(element_id)
+        return tuple(evidence)
+
+    @staticmethod
+    def _irreversible_effect_is_uncertain(
+        node: PlanNode,
+        step: StepResult,
+    ) -> bool:
+        return bool(
+            node.irreversible
+            and step.execution is not None
+            and step.execution.success
+        )
 
     @staticmethod
     def _failure_code(value: str | None) -> FailureCode:
@@ -378,7 +448,7 @@ class TaskRuntime:
         last_step: StepResult | None,
         failure_code: str | None,
         completed: list[str],
-        evidence_ids: list[str],
+        evidence_ids: tuple[str, ...],
         plan: PlanIR,
     ) -> TaskRunResult:
         if self._terminal_committed:
@@ -414,7 +484,7 @@ class TaskRuntime:
             failure_code=normalized_failure,
             final_scene_version=scene.version,
             final_frame_id=frame_id,
-            terminal_evidence_ids=tuple(evidence_ids),
+            terminal_evidence_ids=evidence_ids,
             completed_node_ids=tuple(completed),
             plan_hash=plan.plan_hash,
             patch_lineage=plan.patch_lineage,
