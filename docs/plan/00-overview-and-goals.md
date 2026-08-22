@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime 개발 계획 00 — 프로젝트 개요 및 목표"
-version: "1.1"
-date: "2026-08-21"
+version: "1.2"
+date: "2026-08-22"
 parent: "docs/dev-init-001.md (§1~4, §31~32)"
 language: "ko-KR"
 ---
@@ -30,6 +30,7 @@ language: "ko-KR"
 | `12-roadmap-phases.md` | 개발 로드맵 (Phase 0~8) | §25, §32 |
 | `13-common-pipeline-remediation.md` | 공통 파이프라인 개선 (루프·delta·Grounder) | 코드–문서 검수 |
 | `14-goal-compiled-targeting.md` | 목표 편찬 Targeting Pack | 목표마다 MiniMax가 어휘 팩 편찬 |
+| `15-command-to-plan-runtime-remediation.md` | 사용자 명령·전략·PlanIR·단일 실행 런타임 개선 | 코드·테스트·아티팩트 적대적 검수 |
 
 진행 관리는 `docs/plan/tasklist.md`에서 체크박스 방식으로 수행한다.
 
@@ -52,6 +53,7 @@ language: "ko-KR"
 | 할 일 | `docs/plan/tasklist.md` | 설계를 여기서 바꾸지 않음 |
 | 공통 파이프 부채 해소 순서 | `13-common-pipeline-remediation.md` | 스펙은 01·03·06·07. 여기엔 순서만 |
 | 목표 편찬 TargetingPack·matcher | `docs/plan/14-goal-compiled-targeting.md` | 06/08에 토큰 목록 복제 금지 |
+| 명령 해석·전략 선택·PlanIR·단일 task runtime 개선 순서 | `docs/plan/15-command-to-plan-runtime-remediation.md` | 최종 계약은 01·02·06·07·09·11·14에 반영 |
 | 원안(역사) | `docs/dev-init-001.md` | 새 결정의 집이 아님. plan이 생긴 주제는 plan을 고친다 |
 
 `dev-init-001.md`는 기획 원안이다. 구현 계약이 바뀌면 **plan을 고치고**,
@@ -191,6 +193,10 @@ MVP는 다음 7가지를 증명해야 한다.
 | UIElement | Scene Graph의 노드. 고유 ID와 속성·관계를 가짐 |
 | scene_version | Scene Graph의 단조 증가 버전. stale 판정에 사용 |
 | Grounding | 자연어/구조화 조건을 실제 요소 ID로 연결하는 행위 |
+| GoalEnvelope | 사용자 원문·intent·terminal state·제약·위험·증거 요구를 보존한 계획 입력 DTO |
+| StrategyPlan | capability·비용·위험·증거 강도를 비교해 선택한 실행 방향 |
+| PlanIR | 여러 Action node와 성공·실패 edge를 가진 typed DAG/state machine |
+| TaskBudget | plan·grounding·reanalysis·recovery를 합산하는 task-global 모델 예산 |
 | SoM (Set-of-Mark) | 화면 후보에 번호 overlay를 표시해 VLM이 선택하게 하는 기법 |
 | Evidence Contract | 작업 완료를 입증하는 조건 집합 (선언적 JSON) |
 | Workflow Compiler | 성공 trajectory를 재사용 가능한 결정론 워크플로우로 변환 |

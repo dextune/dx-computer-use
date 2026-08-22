@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime — 개발 태스크리스트"
-version: "1.1"
-date: "2026-08-21"
+version: "1.2"
+date: "2026-08-22"
 parent: "docs/plan/00-overview-and-goals.md, docs/dev-init-001.md §25"
 language: "ko-KR"
 scope: "project-wide, progress tracking"
@@ -17,6 +17,7 @@ Phase 이름·범위는 `docs/dev-init-001.md` §25 / 향후 `12-roadmap-phases.
 
 - `[ ]` 미착수 / `[~]` 진행 중 / `[x]` 완료 (완료 조건 + 테스트 통과 시에만)
 - 완료 조건이 테스트로 증명되지 않은 태스크는 `[x]` 처리 금지
+- 기존 `[x]`는 component 존재와 product qualification을 혼동할 수 있으므로 U1에서 재분류
 - 모든 코드는 `docs/rules/naming-conventions.md`, `docs/rules/testing-standards.md` 준수
 
 ---
@@ -214,6 +215,7 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [x] `docs/plan/02-schemas-and-coordinates.md`, `04`~`12` 작성
 - [x] `docs/plan/13-common-pipeline-remediation.md` (공통 파이프 개선 계획)
 - [x] `docs/plan/14-goal-compiled-targeting.md` (목표 편찬 Targeting Pack)
+- [x] `docs/plan/15-command-to-plan-runtime-remediation.md` (명령→PlanIR→단일 런타임 개선 계획)
 - [x] `docs/decisions/001-three-layer-platform.md`
 - [x] `AGENTS.md` (방향·불변식)
 - [ ] Phase 종료 시 가정·수치를 실측값으로 교체
@@ -244,3 +246,21 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [x] T3 Runner가 pack만 사용. 프로덕션 사이트/CTA 사전 삭제
 - [x] T4 케이스 YAML은 goal+url+예산만
 - [x] T5 compile/grounding 횟수 분리, 시크릿 미누출
+
+---
+
+## Remediation — 사용자 명령·PlanIR·단일 런타임 (U1~U9)
+
+설계는 `docs/plan/15-command-to-plan-runtime-remediation.md`.
+새 사이트 케이스와 OS 기능을 늘리기 전에 U1~U6을 순서대로 닫는다.
+기존 Phase·R·T의 `[x]`는 이 제품 자격 게이트를 대신하지 않는다.
+
+- [ ] U1 execution mode ADR, 재현 가능한 baseline, 지표 분리, 기존 `[x]` product qualification 재분류
+- [ ] U2 `GoalEnvelope` + CPU parser + unresolved slot만 semantic fill
+- [ ] U3 capability-aware `StrategyPlan` + typed multi-step `PlanIR`; TargetingPack은 node grounding hint로 축소
+- [ ] U4 `TaskRuntime` + 유일한 `ControlLoop`; CaseRunner는 test adapter로 축소
+- [ ] U5 action 후 fresh scene verification, stale binding, 독립 evidence, 상태 정규화
+- [ ] U6 task-global `TaskBudget`; compile/ground/reanalysis/recovery 합산, attempt reset 제거
+- [ ] U7 tile hash·ring buffer·dirty ROI·stable OCR ID를 실제 observer hot path에 연결
+- [ ] U8 verified transition 기반 workflow compile + 동일 runtime offline/online replay
+- [ ] U9 held-out 30+ task 제품 게이트: false completion/stale action/policy bypass 0
