@@ -1,0 +1,43 @@
+{
+  "case_id": "google-search-notebook",
+  "success": false,
+  "runner_success": false,
+  "verified_success": false,
+  "human_confirmed": false,
+  "outcome": "model_failed",
+  "failure_code": "model_failed",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 0,
+  "final_frame_id": "",
+  "attempts": 0,
+  "max_attempts": 4,
+  "action_count": 0,
+  "model_call_count": 2,
+  "model_error_count": 1,
+  "model_tokens": 1427,
+  "compile_call_count": 2,
+  "grounding_call_count": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "plan_compile_failed",
+  "actions": [],
+  "ai_calls": [
+    "AiCallRecord(call_number=6, purpose='plan_compile', model='MiniMax-M3', prompt_length=857, provider='minimax', response_tokens=1427, latency_ms=14110, error='')",
+    "AiCallRecord(call_number=7, purpose='plan_compile', model='MiniMax-M3', prompt_length=857, provider='minimax', response_tokens=0, latency_ms=0, error='ReadTimeout')"
+  ],
+  "evidence_status": "not_evaluated",
+  "evidence_scene_version": 0,
+  "evidence_frame_id": "",
+  "evidence_tokens": [],
+  "evidence_element_ids": [],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 44140,
+  "attempts_detail": [],
+  "artifact_manifest": [
+    "artifacts/test-runs/current-10-case-20260822/google-search-notebook.json"
+  ],
+  "decision_diagnostics": []
+}

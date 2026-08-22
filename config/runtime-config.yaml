@@ -9,6 +9,10 @@ semantic:
     action_decision_max_tokens: 512
     reanalysis_max_tokens: 512
     plan_compile_retry_attempts: 2
+    action_decision_retry_attempts: 2
+    reanalysis_retry_attempts: 2
+    retry_base_delay_ms: 500
+    retry_max_delay_ms: 8000
   routes:
     plan_compile: minimax
     situation_analysis: minimax

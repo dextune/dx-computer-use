@@ -264,3 +264,18 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [ ] U7 tile hash·ring buffer·dirty ROI·stable OCR ID를 실제 observer hot path에 연결
 - [ ] U8 verified transition 기반 workflow compile + 동일 runtime offline/online replay
 - [ ] U9 held-out 30+ task 제품 게이트: false completion/stale action/policy bypass 0
+
+---
+
+## Remediation — 모델 응답 신뢰성 (S1~S5)
+
+설계는 `docs/plan/16-model-response-reliability.md`.
+이 작업들은 U1~U9 마이그레이션과 충돌하지 않으며, `CaseRunner` 테스트
+어댑터의 단기 신뢰성을 개선한다. 완료 후에도 10/10 성공이 보장되지는
+않는다 — 이 계획은 MiniMax 응답 품질 자체를 바꾸지 않는다.
+
+- [x] S1 실패 진단 로깅: `_load_exact_object` 실패 시 raw response prefix를 `decision_diagnostics`에 기록
+- [x] S2 JSON 파싱 강건화: `_extract_json_object` — markdown fence, bracket counting, extra key 허용
+- [x] S3 transient error 재시도 + backoff: `RetryableGateway`, action/reanalysis에도 retry 적용
+- [x] S4 reanalysis evidence fallback: schema 실패 시 `_pack_evidence_holds`로 2차 검증
+- [x] S5 10개 케이스 재실행 및 성공률 비교

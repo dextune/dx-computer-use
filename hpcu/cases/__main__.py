@@ -12,6 +12,7 @@ from hpcu.cases.runner import CaseRunner
 from hpcu.cases.specs import load_cases
 from hpcu.cases.stats import CountingGateway, dumps_stats
 from hpcu.executor.executor import Executor
+from hpcu.gateway.gateway import RetryableGateway
 from hpcu.gateway.registry import create_gateway
 from hpcu.grounder.grounder import Grounder
 from hpcu.observation.facade import CompositeObserver
@@ -40,7 +41,16 @@ async def _run(args: argparse.Namespace) -> int:
         return 2
     runtime_config = load_runtime_config()
     try:
-        gateway = CountingGateway(create_gateway(runtime_config))
+        semantic_limits = runtime_config.get("semantic", {}).get("request_limits", {})
+        retry_attempts = int(semantic_limits.get("action_decision_retry_attempts", 2))
+        retry_base = int(semantic_limits.get("retry_base_delay_ms", 500))
+        retry_max = int(semantic_limits.get("retry_max_delay_ms", 8000))
+        gateway = RetryableGateway(
+            CountingGateway(create_gateway(runtime_config)),
+            max_retries=retry_attempts,
+            base_delay_ms=retry_base,
+            max_delay_ms=retry_max,
+        )
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2

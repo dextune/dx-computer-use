@@ -1,5 +1,7 @@
 """Provider-neutral gateway contracts for semantic model calls."""
 
+import random
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -94,3 +96,95 @@ class Gateway(ABC):
     ) -> GatewayResponse:
         """Send a purpose-tagged request and return its response."""
         ...
+
+
+# Transient error types to retry
+_TRANSIENT_HTTP_STATUS = frozenset({429, 502, 503, 504})
+
+
+class RetryableGateway(Gateway):
+    """Transient-error retry wrapper around any Gateway.
+
+    Retries on network errors (ReadTimeout, ConnectError, RemoteProtocolError)
+    and HTTP 429/502/503/504 with exponential backoff + jitter.
+    Does NOT retry on 4xx (except 429) or schema errors.
+    """
+
+    def __init__(
+        self,
+        inner: Gateway,
+        *,
+        max_retries: int = 2,
+        base_delay_ms: int = 500,
+        max_delay_ms: int = 8000,
+    ):
+        self._inner = inner
+        self._max_retries = max_retries
+        self._base_delay_ms = base_delay_ms
+        self._max_delay_ms = max_delay_ms
+
+    @property
+    def provider_id(self) -> str:
+        return self._inner.provider_id
+
+    @property
+    def model_id(self) -> str:
+        return self._inner.model_id
+
+    def __getattr__(self, name: str):
+        """Delegate attribute access to the inner gateway.
+
+        This allows CountingGateway-specific attributes (call_count,
+        error_count, tokens, ai_calls, require_configured_identity, etc.)
+        to be accessed transparently through the retry wrapper.
+        """
+        # Avoid infinite recursion: __getattr__ is only called when the
+        # attribute is not found through normal lookup.
+        return getattr(self._inner, name)
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                return self._inner.call(
+                    prompt, system_prompt, max_tokens, purpose=purpose
+                )
+            except Exception as exc:
+                last_error = exc
+                if attempt == self._max_retries:
+                    raise
+                if not self._is_transient(exc):
+                    raise
+                delay_ms = min(
+                    self._base_delay_ms * (2 ** attempt)
+                    + random.randint(0, self._base_delay_ms),
+                    self._max_delay_ms,
+                )
+                time.sleep(delay_ms / 1000.0)
+        raise last_error  # type: ignore[misc]
+
+    @staticmethod
+    def _is_transient(exc: Exception) -> bool:
+        """Return True when the error is likely transient and worth retrying."""
+        name = type(exc).__name__
+        # httpx errors
+        if name in (
+            "ReadTimeout",
+            "ConnectError",
+            "RemoteProtocolError",
+            "ConnectTimeout",
+            "ReadError",
+            "WriteError",
+        ):
+            return True
+        # HTTP status errors (httpx.HTTPStatusError)
+        if hasattr(exc, "response") and hasattr(exc.response, "status_code"):
+            return exc.response.status_code in _TRANSIENT_HTTP_STATUS
+        return False

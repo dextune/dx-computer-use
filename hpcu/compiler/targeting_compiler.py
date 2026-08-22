@@ -14,6 +14,7 @@ from typing import Optional
 from hpcu.cases.stats import CountingGateway
 from hpcu.gateway.gateway import ModelCallPurpose
 from hpcu.runtime_config import load_runtime_config
+from hpcu.schemas.decision import _extract_json_object
 from hpcu.schemas.targeting import TargetingPack
 
 _PUNCTUATION_SPLIT = re.compile(r"[，。！？、\s,;:.!?()\[\]{}<>\"'\-_/\\|@#$%^&*+=~`]+")
@@ -119,15 +120,9 @@ class TargetingCompiler:
 def _load_json_object(content: str) -> dict | None:
     """Load a JSON object from a provider response without semantic repair."""
     try:
-        payload = json.loads(content)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", content, re.DOTALL)
-        if match is None:
-            return None
-        try:
-            payload = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return None
+        payload = _extract_json_object(content)
+    except ValueError:
+        return None
     return payload if isinstance(payload, dict) else None
 
 

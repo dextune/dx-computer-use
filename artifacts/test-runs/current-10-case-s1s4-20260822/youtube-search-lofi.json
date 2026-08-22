@@ -1,0 +1,84 @@
+{
+  "case_id": "youtube-search-lofi",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "decision_required",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 16,
+  "final_frame_id": "",
+  "attempts": 2,
+  "max_attempts": 4,
+  "action_count": 22,
+  "model_call_count": 4,
+  "model_error_count": 0,
+  "model_tokens": 3719,
+  "compile_call_count": 1,
+  "grounding_call_count": 3,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "Best of lofi hip hop 2021 i [beats to relax/study to] H",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=12', ok=True)",
+    "ActionRecord(kind='focus', detail='laptop notebook under 2000000 KRW - Google 검색 - Chromium', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=13', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='capture', detail='attempt-1 v=14', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='none', ok=False)",
+    "ActionRecord(kind='decision', detail='no_model_decision', ok=False)",
+    "ActionRecord(kind='capture', detail='attempt-2 v=15', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='click', detail='Best of lofi hip hop 2021 i [beats to relax/study to] H', ok=True)",
+    "ActionRecord(kind='capture', detail='post_click v=16', ok=True)",
+    "ActionRecord(kind='settle', detail='post_click', ok=True)",
+    "ActionRecord(kind='evidence_detail', detail='reanalysis_fallback scene=16 frame=sandbox-shopping-1787416071332016987 elements=x11:14680068,ocr_line_0,ocr_line_11', ok=True)",
+    "ActionRecord(kind='reanalysis', detail='evidence_fallback', ok=True)",
+    "ActionRecord(kind='evidence_detail', detail='post_action scene=16 frame=sandbox-shopping-1787416071332016987 elements=x11:14680068,ocr_line_0,ocr_line_11', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=10, purpose='plan_compile', model='MiniMax-M3', prompt_length=844, provider='minimax', response_tokens=709, latency_ms=3878, error='')",
+    "AiCallRecord(call_number=11, purpose='action_decision', model='MiniMax-M3', prompt_length=1695, provider='minimax', response_tokens=1033, latency_ms=17703, error='')",
+    "AiCallRecord(call_number=12, purpose='action_decision', model='MiniMax-M3', prompt_length=1712, provider='minimax', response_tokens=1138, latency_ms=5621, error='')",
+    "AiCallRecord(call_number=13, purpose='post_action_reanalysis', model='MiniMax-M3', prompt_length=584, provider='minimax', response_tokens=839, latency_ms=19242, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "evidence_scene_version": 16,
+  "evidence_frame_id": "sandbox-shopping-1787416071332016987",
+  "evidence_tokens": [
+    "lofi",
+    "chill",
+    "study music",
+    "beats",
+    "24/7"
+  ],
+  "evidence_element_ids": [
+    "x11:14680068",
+    "ocr_line_0",
+    "ocr_line_11"
+  ],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 1,
+  "elapsed_ms": 53848,
+  "attempts_detail": [
+    "AttemptRecord(attempt=1, scene_version_start=14, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=False, model_call_start=10, model_call_end=11, failure='decision_required')",
+    "AttemptRecord(attempt=2, scene_version_start=15, selected_target='ocr_line_11', action_ok=True, post_scene_version=16, reanalysis_ok=True, verification_satisfied=True, model_call_start=11, model_call_end=13, failure='')"
+  ],
+  "artifact_manifest": [
+    "artifacts/test-runs/current-10-case-s1s4-20260822/youtube-search-lofi-evidence.png",
+    "artifacts/test-runs/current-10-case-s1s4-20260822/youtube-search-lofi.json"
+  ],
+  "decision_diagnostics": [
+    "reanalysis scene=16: ValueError: reason_code must be a string"
+  ]
+}

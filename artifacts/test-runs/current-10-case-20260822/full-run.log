@@ -1,0 +1,1654 @@
+CASE_START coupang-fresh-popular
+CASE_END coupang-fresh-popular success=False actions=27 model_calls=5 model_errors=0 failure=model_schema_invalid
+CASE_START google-search-notebook
+CASE_END google-search-notebook success=False actions=0 model_calls=2 model_errors=1 failure=plan_compile_failed
+CASE_START youtube-search-lofi
+CASE_END youtube-search-lofi success=True actions=21 model_calls=4 model_errors=0 failure=
+CASE_START wikipedia-seoul
+CASE_END wikipedia-seoul success=True actions=13 model_calls=1 model_errors=0 failure=
+CASE_START bbc-news
+CASE_END bbc-news success=True actions=12 model_calls=1 model_errors=0 failure=
+CASE_START duckduckgo-linux
+CASE_END duckduckgo-linux success=True actions=13 model_calls=1 model_errors=0 failure=
+CASE_START github-explore
+CASE_END github-explore success=True actions=16 model_calls=2 model_errors=0 failure=
+CASE_START wikipedia-python
+CASE_END wikipedia-python success=True actions=13 model_calls=2 model_errors=0 failure=
+CASE_START mdn-javascript
+CASE_END mdn-javascript success=True actions=12 model_calls=1 model_errors=0 failure=
+CASE_START example-org
+CASE_END example-org success=False actions=20 model_calls=4 model_errors=0 failure=model_schema_invalid
+{
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "cases": [
+    {
+      "case_id": "coupang-fresh-popular",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_schema_invalid",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 9,
+      "final_frame_id": "",
+      "attempts": 3,
+      "max_attempts": 4,
+      "action_count": 27,
+      "model_call_count": 5,
+      "model_error_count": 0,
+      "model_tokens": 5391,
+      "compile_call_count": 1,
+      "grounding_call_count": 4,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_schema_invalid",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=1",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Desktop",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=2",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=3",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=4",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=5",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=6",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "decision",
+          "detail": "halt",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=7",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "model_schema",
+          "detail": "strict_action_rejected",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-3 v=8",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "> 쿠 팡 플레이 Paws ,\" 코 켓 프레시 QAO [|2 쿠 팡 비즈 ewe . 9 꼴 드 박스 Bows Massy @ 판 매 자 특가 ee",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "post_click v=9",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "post_click",
+          "ok": true
+        },
+        {
+          "kind": "reanalysis",
+          "detail": "strict_reanalysis_rejected",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 1,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 846,
+          "provider": "minimax",
+          "response_tokens": 803,
+          "latency_ms": 11793,
+          "error": ""
+        },
+        {
+          "call_number": 2,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1513,
+          "provider": "minimax",
+          "response_tokens": 1182,
+          "latency_ms": 13208,
+          "error": ""
+        },
+        {
+          "call_number": 3,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1612,
+          "provider": "minimax",
+          "response_tokens": 1265,
+          "latency_ms": 6539,
+          "error": ""
+        },
+        {
+          "call_number": 4,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1552,
+          "provider": "minimax",
+          "response_tokens": 1015,
+          "latency_ms": 4422,
+          "error": ""
+        },
+        {
+          "call_number": 5,
+          "purpose": "post_action_reanalysis",
+          "model": "MiniMax-M3",
+          "prompt_length": 1122,
+          "provider": "minimax",
+          "response_tokens": 1126,
+          "latency_ms": 15849,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "evidence_scene_version": 0,
+      "evidence_frame_id": "",
+      "evidence_tokens": [],
+      "evidence_element_ids": [],
+      "stale_rejection_count": 1,
+      "reanalysis_count": 0,
+      "elapsed_ms": 66492,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 6,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 1,
+          "model_call_end": 2,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 7,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 2,
+          "model_call_end": 3,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 3,
+          "scene_version_start": 8,
+          "selected_target": "ocr_line_4",
+          "action_ok": true,
+          "post_scene_version": 9,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 3,
+          "model_call_end": 5,
+          "failure": "model_schema_invalid"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/coupang-fresh-popular.json"
+      ],
+      "decision_diagnostics": [
+        "action scene=7: ValueError: response must be one JSON object",
+        "reanalysis scene=9: ValueError: response must be one JSON object"
+      ]
+    },
+    {
+      "case_id": "google-search-notebook",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_failed",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 0,
+      "final_frame_id": "",
+      "attempts": 0,
+      "max_attempts": 4,
+      "action_count": 0,
+      "model_call_count": 2,
+      "model_error_count": 1,
+      "model_tokens": 1427,
+      "compile_call_count": 2,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "plan_compile_failed",
+      "actions": [],
+      "ai_calls": [
+        {
+          "call_number": 6,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 857,
+          "provider": "minimax",
+          "response_tokens": 1427,
+          "latency_ms": 14110,
+          "error": ""
+        },
+        {
+          "call_number": 7,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 857,
+          "provider": "minimax",
+          "response_tokens": 0,
+          "latency_ms": 0,
+          "error": "ReadTimeout"
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "evidence_scene_version": 0,
+      "evidence_frame_id": "",
+      "evidence_tokens": [],
+      "evidence_element_ids": [],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 44140,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/google-search-notebook.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "youtube-search-lofi",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "decision_required",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 14,
+      "final_frame_id": "",
+      "attempts": 2,
+      "max_attempts": 4,
+      "action_count": 21,
+      "model_call_count": 4,
+      "model_error_count": 0,
+      "model_tokens": 3191,
+      "compile_call_count": 1,
+      "grounding_call_count": 3,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "Best of lofi hip hop 2021 i [beats to relax/study to]",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=10",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "coupang.com/np/categories/194276 - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=11",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=12",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "decision",
+          "detail": "none",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=13",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "Best of lofi hip hop 2021 i [beats to relax/study to]",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "post_click v=14",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "post_click",
+          "ok": true
+        },
+        {
+          "kind": "reanalysis",
+          "detail": "post_action_reanalysis",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "post_action scene=14 frame=sandbox-shopping-1787414548416769675 elements=x11:14680068,ocr_line_0,ocr_line_11,ocr_line_10",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 8,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 844,
+          "provider": "minimax",
+          "response_tokens": 726,
+          "latency_ms": 7100,
+          "error": ""
+        },
+        {
+          "call_number": 9,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 945,
+          "provider": "minimax",
+          "response_tokens": 612,
+          "latency_ms": 3423,
+          "error": ""
+        },
+        {
+          "call_number": 10,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1684,
+          "provider": "minimax",
+          "response_tokens": 1129,
+          "latency_ms": 4687,
+          "error": ""
+        },
+        {
+          "call_number": 11,
+          "purpose": "post_action_reanalysis",
+          "model": "MiniMax-M3",
+          "prompt_length": 1313,
+          "provider": "minimax",
+          "response_tokens": 724,
+          "latency_ms": 2081,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 14,
+      "evidence_frame_id": "sandbox-shopping-1787414548416769675",
+      "evidence_tokens": [
+        "lofi",
+        "chill",
+        "beats",
+        "hip hop",
+        "mix",
+        "24/7",
+        "radio",
+        "study",
+        "play",
+        "Now playing",
+        "▶",
+        "Playing"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_0",
+        "ocr_line_11",
+        "ocr_line_10"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 1,
+      "elapsed_ms": 33876,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 12,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 8,
+          "model_call_end": 9,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 13,
+          "selected_target": "ocr_line_10",
+          "action_ok": true,
+          "post_scene_version": 14,
+          "reanalysis_ok": true,
+          "verification_satisfied": true,
+          "model_call_start": 9,
+          "model_call_end": 11,
+          "failure": ""
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/youtube-search-lofi-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/youtube-search-lofi.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "wikipedia-seoul",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 17,
+      "final_frame_id": "sandbox-shopping-1787414560813927958",
+      "attempts": 0,
+      "max_attempts": 4,
+      "action_count": 13,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 709,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=15",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "youtube.com/results?search_query=lofi+hip+hop - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=16",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=17",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=17 frame=sandbox-shopping-1787414560813927958 elements=ocr_line_1,ocr_line_3,ocr_line_4,ocr_line_6,ocr_line_7,ocr_line_8,ocr_line_9,ocr_line_11,ocr_line_16",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 12,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 825,
+          "provider": "minimax",
+          "response_tokens": 709,
+          "latency_ms": 4527,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 17,
+      "evidence_frame_id": "sandbox-shopping-1787414560813927958",
+      "evidence_tokens": [
+        "Seoul",
+        "capital of South Korea",
+        "From Wikipedia, the free encyclopedia"
+      ],
+      "evidence_element_ids": [
+        "ocr_line_1",
+        "ocr_line_3",
+        "ocr_line_4",
+        "ocr_line_6",
+        "ocr_line_7",
+        "ocr_line_8",
+        "ocr_line_9",
+        "ocr_line_11",
+        "ocr_line_16"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 10362,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/wikipedia-seoul-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/wikipedia-seoul.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "bbc-news",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 19,
+      "final_frame_id": "sandbox-shopping-1787414568900331470",
+      "attempts": 0,
+      "max_attempts": 4,
+      "action_count": 12,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 918,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=18",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "New Tab - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=19",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=19 frame=sandbox-shopping-1787414568900331470 elements=x11:14680068,ocr_line_1,ocr_line_2",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 13,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 918,
+          "latency_ms": 3892,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 19,
+      "evidence_frame_id": "sandbox-shopping-1787414568900331470",
+      "evidence_tokens": [
+        "BBC",
+        "News",
+        "Top Stories",
+        "Latest",
+        "Home"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_1",
+        "ocr_line_2"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 7490,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/bbc-news-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/bbc-news.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "duckduckgo-linux",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 22,
+      "final_frame_id": "sandbox-shopping-1787414578954278402",
+      "attempts": 0,
+      "max_attempts": 4,
+      "action_count": 13,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 663,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=20",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "BBC News - Breaking news, video and the latest top stories from the U.S. and aro",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=21",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=22",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=22 frame=sandbox-shopping-1787414578954278402 elements=ocr_line_3,ocr_line_5,ocr_line_6,ocr_line_8,ocr_line_10,ocr_line_12,ocr_line_14,ocr_line_17,ocr_line_18",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 14,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 824,
+          "provider": "minimax",
+          "response_tokens": 663,
+          "latency_ms": 5666,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 22,
+      "evidence_frame_id": "sandbox-shopping-1787414578954278402",
+      "evidence_tokens": [
+        "Linux",
+        "Wikipedia",
+        "About",
+        "results",
+        "kernel"
+      ],
+      "evidence_element_ids": [
+        "ocr_line_3",
+        "ocr_line_5",
+        "ocr_line_6",
+        "ocr_line_8",
+        "ocr_line_10",
+        "ocr_line_12",
+        "ocr_line_14",
+        "ocr_line_17",
+        "ocr_line_18"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 10260,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/duckduckgo-linux-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/duckduckgo-linux.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "github-explore",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 26,
+      "final_frame_id": "",
+      "attempts": 1,
+      "max_attempts": 4,
+      "action_count": 16,
+      "model_call_count": 2,
+      "model_error_count": 0,
+      "model_tokens": 1453,
+      "compile_call_count": 1,
+      "grounding_call_count": 1,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "Links to popular distribution download pages 24 Popular Linux Distributions Explore different Linux",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=23",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "linux at DuckDuckGo - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=24",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=25",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "Links to popular distribution download pages 24 Popular Linux Distributions Expl",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "post_click v=26",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "post_click",
+          "ok": true
+        },
+        {
+          "kind": "reanalysis",
+          "detail": "post_action_reanalysis",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "post_action scene=26 frame=sandbox-shopping-1787414588253406381 elements=ocr_line_1,ocr_line_2,ocr_line_3,x11:14680068,ocr_line_18",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 15,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 818,
+          "provider": "minimax",
+          "response_tokens": 665,
+          "latency_ms": 3858,
+          "error": ""
+        },
+        {
+          "call_number": 16,
+          "purpose": "post_action_reanalysis",
+          "model": "MiniMax-M3",
+          "prompt_length": 1273,
+          "provider": "minimax",
+          "response_tokens": 788,
+          "latency_ms": 7862,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 26,
+      "evidence_frame_id": "sandbox-shopping-1787414588253406381",
+      "evidence_tokens": [
+        "Explore",
+        "GitHub",
+        "Trending"
+      ],
+      "evidence_element_ids": [
+        "ocr_line_1",
+        "ocr_line_2",
+        "ocr_line_3",
+        "x11:14680068",
+        "ocr_line_18"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 1,
+      "elapsed_ms": 17337,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 25,
+          "selected_target": "ocr_line_18",
+          "action_ok": true,
+          "post_scene_version": 26,
+          "reanalysis_ok": true,
+          "verification_satisfied": true,
+          "model_call_start": 15,
+          "model_call_end": 16,
+          "failure": ""
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/github-explore-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/github-explore.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "wikipedia-python",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 29,
+      "final_frame_id": "sandbox-shopping-1787414608192787771",
+      "attempts": 1,
+      "max_attempts": 4,
+      "action_count": 13,
+      "model_call_count": 2,
+      "model_error_count": 0,
+      "model_tokens": 1811,
+      "compile_call_count": 1,
+      "grounding_call_count": 1,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=27",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Explore GitHub · GitHub - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=28",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=29",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "decision",
+          "detail": "goal_already_satisfied",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 17,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 856,
+          "provider": "minimax",
+          "response_tokens": 739,
+          "latency_ms": 7253,
+          "error": ""
+        },
+        {
+          "call_number": 18,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 2349,
+          "provider": "minimax",
+          "response_tokens": 1072,
+          "latency_ms": 3318,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 29,
+      "evidence_frame_id": "sandbox-shopping-1787414608192787771",
+      "evidence_tokens": [
+        "Python",
+        "programming language",
+        "Contents",
+        "History",
+        "Wikipedia"
+      ],
+      "evidence_element_ids": [
+        "ocr_line_1",
+        "ocr_line_2",
+        "ocr_line_3",
+        "ocr_line_4",
+        "ocr_line_8",
+        "ocr_line_12",
+        "ocr_line_14",
+        "ocr_line_15",
+        "ocr_line_17"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 15713,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 29,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": true,
+          "model_call_start": 17,
+          "model_call_end": 18,
+          "failure": ""
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/wikipedia-python-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/wikipedia-python.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "mdn-javascript",
+      "success": true,
+      "runner_success": true,
+      "verified_success": true,
+      "human_confirmed": false,
+      "outcome": "verified_success",
+      "failure_code": "",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 31,
+      "final_frame_id": "sandbox-shopping-1787414625283962835",
+      "attempts": 0,
+      "max_attempts": 4,
+      "action_count": 12,
+      "model_call_count": 1,
+      "model_error_count": 0,
+      "model_tokens": 721,
+      "compile_call_count": 1,
+      "grounding_call_count": 0,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=30",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "Python (programming language) - Wikipedia - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=31",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "evidence_detail",
+          "detail": "after_navigate scene=31 frame=sandbox-shopping-1787414625283962835 elements=x11:14680068,ocr_line_0,ocr_line_1,ocr_line_2,ocr_line_3,ocr_line_4,ocr_line_7,ocr_line_11,ocr_line_13,ocr_line_16",
+          "ok": true
+        },
+        {
+          "kind": "evidence",
+          "detail": "after_navigate",
+          "ok": true
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 19,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 848,
+          "provider": "minimax",
+          "response_tokens": 721,
+          "latency_ms": 9345,
+          "error": ""
+        }
+      ],
+      "evidence_status": "satisfied",
+      "evidence_scene_version": 31,
+      "evidence_frame_id": "sandbox-shopping-1787414625283962835",
+      "evidence_tokens": [
+        "JavaScript",
+        "MDN Web Docs",
+        "JavaScript reference",
+        "JavaScript guide"
+      ],
+      "evidence_element_ids": [
+        "x11:14680068",
+        "ocr_line_0",
+        "ocr_line_1",
+        "ocr_line_2",
+        "ocr_line_3",
+        "ocr_line_4",
+        "ocr_line_7",
+        "ocr_line_11",
+        "ocr_line_13",
+        "ocr_line_16"
+      ],
+      "stale_rejection_count": 0,
+      "reanalysis_count": 0,
+      "elapsed_ms": 13531,
+      "attempts_detail": [],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/mdn-javascript-evidence.png",
+        "artifacts/test-runs/current-10-case-20260822/mdn-javascript.json"
+      ],
+      "decision_diagnostics": []
+    },
+    {
+      "case_id": "example-org",
+      "success": false,
+      "runner_success": false,
+      "verified_success": false,
+      "human_confirmed": false,
+      "outcome": "model_failed",
+      "failure_code": "model_schema_invalid",
+      "challenge_kind": "",
+      "handoff_required": false,
+      "final_scene_version": 36,
+      "final_frame_id": "",
+      "attempts": 2,
+      "max_attempts": 4,
+      "action_count": 20,
+      "model_call_count": 4,
+      "model_error_count": 0,
+      "model_tokens": 2616,
+      "compile_call_count": 1,
+      "grounding_call_count": 3,
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "selected_text": "",
+      "failure": "model_schema_invalid",
+      "actions": [
+        {
+          "kind": "capture",
+          "detail": "pre_navigate v=32",
+          "ok": true
+        },
+        {
+          "kind": "focus",
+          "detail": "JavaScript | MDN - Chromium",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "new_tab",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "omnibox",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "focus_location",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "select_all",
+          "ok": true
+        },
+        {
+          "kind": "type",
+          "detail": "url",
+          "ok": true
+        },
+        {
+          "kind": "key",
+          "detail": "Enter",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "navigate_settle v=33",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "navigate_settle",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-1 v=34",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "decision",
+          "detail": "none",
+          "ok": false
+        },
+        {
+          "kind": "decision",
+          "detail": "no_model_decision",
+          "ok": false
+        },
+        {
+          "kind": "capture",
+          "detail": "attempt-2 v=35",
+          "ok": true
+        },
+        {
+          "kind": "model",
+          "detail": "minimax/MiniMax-M3",
+          "ok": true
+        },
+        {
+          "kind": "click",
+          "detail": "Learn more",
+          "ok": true
+        },
+        {
+          "kind": "capture",
+          "detail": "post_click v=36",
+          "ok": true
+        },
+        {
+          "kind": "settle",
+          "detail": "post_click",
+          "ok": true
+        },
+        {
+          "kind": "reanalysis",
+          "detail": "strict_reanalysis_rejected",
+          "ok": false
+        }
+      ],
+      "ai_calls": [
+        {
+          "call_number": 20,
+          "purpose": "plan_compile",
+          "model": "MiniMax-M3",
+          "prompt_length": 811,
+          "provider": "minimax",
+          "response_tokens": 718,
+          "latency_ms": 2645,
+          "error": ""
+        },
+        {
+          "call_number": 21,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1074,
+          "provider": "minimax",
+          "response_tokens": 686,
+          "latency_ms": 7059,
+          "error": ""
+        },
+        {
+          "call_number": 22,
+          "purpose": "action_decision",
+          "model": "MiniMax-M3",
+          "prompt_length": 1074,
+          "provider": "minimax",
+          "response_tokens": 641,
+          "latency_ms": 2811,
+          "error": ""
+        },
+        {
+          "call_number": 23,
+          "purpose": "post_action_reanalysis",
+          "model": "MiniMax-M3",
+          "prompt_length": 677,
+          "provider": "minimax",
+          "response_tokens": 571,
+          "latency_ms": 3666,
+          "error": ""
+        }
+      ],
+      "evidence_status": "not_evaluated",
+      "evidence_scene_version": 0,
+      "evidence_frame_id": "",
+      "evidence_tokens": [],
+      "evidence_element_ids": [],
+      "stale_rejection_count": 1,
+      "reanalysis_count": 0,
+      "elapsed_ms": 20838,
+      "attempts_detail": [
+        {
+          "attempt": 1,
+          "scene_version_start": 34,
+          "selected_target": "",
+          "action_ok": false,
+          "post_scene_version": 0,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 20,
+          "model_call_end": 21,
+          "failure": "decision_required"
+        },
+        {
+          "attempt": 2,
+          "scene_version_start": 35,
+          "selected_target": "ocr_line_2",
+          "action_ok": true,
+          "post_scene_version": 36,
+          "reanalysis_ok": false,
+          "verification_satisfied": false,
+          "model_call_start": 21,
+          "model_call_end": 23,
+          "failure": "model_schema_invalid"
+        }
+      ],
+      "artifact_manifest": [
+        "artifacts/test-runs/current-10-case-20260822/example-org.json"
+      ],
+      "decision_diagnostics": [
+        "reanalysis scene=36: ValueError: reason_code must be a string"
+      ]
+    }
+  ],
+  "totals": {
+    "cases": 10,
+    "successes": 7,
+    "action_count": 147,
+    "model_call_count": 23,
+    "model_error_count": 1,
+    "model_tokens": 18900,
+    "compile_call_count": 11,
+    "grounding_call_count": 12,
+    "purpose_call_counts": {
+      "intent_fill": 0,
+      "plan_compile": 11,
+      "grounding": 0,
+      "situation_analysis": 0,
+      "action_decision": 8,
+      "post_action_reanalysis": 4,
+      "recovery_reanalysis": 0
+    }
+  }
+}

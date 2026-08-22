@@ -1,0 +1,80 @@
+{
+  "case_id": "google-search-notebook",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "decision_required",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 11,
+  "final_frame_id": "sandbox-shopping-1787416032892591970",
+  "attempts": 2,
+  "max_attempts": 4,
+  "action_count": 17,
+  "model_call_count": 3,
+  "model_error_count": 0,
+  "model_tokens": 2692,
+  "compile_call_count": 1,
+  "grounding_call_count": 2,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=8', ok=True)",
+    "ActionRecord(kind='focus', detail='식품 - 추천 기획전, 프리미엄 푸드, 수입식품관, 식품 선물세트 | 쿠팡 - Chromium', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=9', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='capture', detail='attempt-1 v=10', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='none', ok=False)",
+    "ActionRecord(kind='decision', detail='no_model_decision', ok=False)",
+    "ActionRecord(kind='capture', detail='attempt-2 v=11', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='goal_already_satisfied', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=7, purpose='plan_compile', model='MiniMax-M3', prompt_length=857, provider='minimax', response_tokens=1025, latency_ms=9307, error='')",
+    "AiCallRecord(call_number=8, purpose='action_decision', model='MiniMax-M3', prompt_length=1119, provider='minimax', response_tokens=785, latency_ms=3511, error='')",
+    "AiCallRecord(call_number=9, purpose='action_decision', model='MiniMax-M3', prompt_length=1752, provider='minimax', response_tokens=882, latency_ms=3509, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "evidence_scene_version": 11,
+  "evidence_frame_id": "sandbox-shopping-1787416032892591970",
+  "evidence_tokens": [
+    "2,000,000",
+    "200만원",
+    "가격비교",
+    "노트북",
+    "삼성",
+    "LG",
+    "레노버",
+    "ASUS",
+    "HP",
+    "Dell"
+  ],
+  "evidence_element_ids": [
+    "ocr_line_5",
+    "ocr_line_7"
+  ],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 0,
+  "elapsed_ms": 22553,
+  "attempts_detail": [
+    "AttemptRecord(attempt=1, scene_version_start=10, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=False, model_call_start=7, model_call_end=8, failure='decision_required')",
+    "AttemptRecord(attempt=2, scene_version_start=11, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=True, model_call_start=8, model_call_end=9, failure='')"
+  ],
+  "artifact_manifest": [
+    "artifacts/test-runs/current-10-case-s1s4-20260822/google-search-notebook-evidence.png",
+    "artifacts/test-runs/current-10-case-s1s4-20260822/google-search-notebook.json"
+  ],
+  "decision_diagnostics": []
+}

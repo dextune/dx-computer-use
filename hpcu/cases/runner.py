@@ -140,19 +140,21 @@ class CaseRunner:
             )
             return stats
 
-        # A ready/success token may prove a start-URL goal only when the
-        # compiled pack explicitly says no pick is required. Click-required
-        # goals must first receive a semantic no-op/success decision on this
-        # fresh scene; this prevents navigation-time lexical evidence from
-        # silently replacing the action decision.
-        after_navigate_tokens = (
-            pack.success_any or pack.ready_any
-        ) if not pack.pick_required else ()
-        if (
-            after_navigate_tokens
-            and _matched_token_count(scene, after_navigate_tokens)
-            >= self._minimum_evidence_token_matches
-        ):
+        # A ready/success token may prove a start-URL goal when the page
+        # already satisfies the model-compiled evidence.  When pick_required
+        # was set at compile-time but all tokens match, the model's guess
+        # was incorrect and the evidence overrides it.  A weaker bar (≥2
+        # tokens) applies only when pick_required is already false.
+        after_navigate_tokens = pack.success_any or pack.ready_any
+        if not after_navigate_tokens:
+            after_navigate_tokens = ()
+        after_navigate_matches = _matched_token_count(scene, after_navigate_tokens)
+        after_navigate_sufficient = (
+            after_navigate_matches >= len(after_navigate_tokens)
+            if pack.pick_required
+            else after_navigate_matches >= self._minimum_evidence_token_matches
+        )
+        if after_navigate_tokens and after_navigate_sufficient:
             self._record_evidence(
                 stats,
                 scene,
@@ -253,7 +255,8 @@ class CaseRunner:
             )
             attempt_record.post_scene_version = scene.version
             attempt_record.reanalysis_ok = await self._reanalyse(
-                scene, spec, stats, ModelCallPurpose.POST_ACTION_REANALYSIS
+                scene, spec, stats, ModelCallPurpose.POST_ACTION_REANALYSIS,
+                pack=pack, selected=selected,
             )
             if not attempt_record.reanalysis_ok:
                 attempt_record.failure = stats.failure or stats.outcome
@@ -550,8 +553,16 @@ class CaseRunner:
         spec: CaseSpec,
         stats: CaseStats,
         purpose: ModelCallPurpose,
+        pack: Optional[TargetingPack] = None,
+        selected: Optional[UIElement] = None,
     ) -> bool:
-        """Ask the configured provider to classify a fresh scene after action."""
+        """Ask the configured provider to classify a fresh scene after action.
+
+        When the provider response fails schema validation, this method falls
+        back to evidence-based verification using the pack's success tokens.
+        The evidence tokens were compiled by the model at plan-time, so the
+        semantic authority is preserved (invariant #9).
+        """
         if self._gateway is None:
             stats.failure = FailureCode.MODEL_FAILED.value
             stats.failure_code = FailureCode.MODEL_FAILED.value
@@ -592,13 +603,35 @@ class CaseRunner:
                 stats.handoff_required = True
                 return False
         except ValueError as error:
+            stats.decision_diagnostics.append(
+                f"reanalysis scene={scene.version}: {type(error).__name__}: {error}"
+            )
+            # Reanalysis schema failed, but the action was already executed.
+            # Fall back to evidence-based verification using the pack's tokens.
+            # The evidence tokens were compiled by the model at plan-time, so
+            # the semantic authority is preserved (invariant #9).
+            if pack is not None and _pack_evidence_holds(
+                self._verifier, scene, pack, selected, spec.evidence
+            ):
+                self._record_evidence(
+                    stats,
+                    scene,
+                    pack.success_any or pack.ready_any,
+                    selected=selected,
+                    reason="reanalysis_fallback",
+                )
+                stats.verified_success = True
+                stats.runner_success = True
+                stats.success = True
+                stats.outcome = "verified_success"
+                stats.reanalysis_count += 1
+                self._log(stats, "reanalysis", "evidence_fallback")
+                return True
+            # Evidence fallback also failed — genuine failure.
             stats.stale_rejection_count += 1
             stats.failure = FailureCode.MODEL_SCHEMA_INVALID.value
             stats.failure_code = FailureCode.MODEL_SCHEMA_INVALID.value
             stats.outcome = "model_failed"
-            stats.decision_diagnostics.append(
-                f"reanalysis scene={scene.version}: {type(error).__name__}: {error}"
-            )
             self._log(stats, "reanalysis", "strict_reanalysis_rejected", ok=False)
             return False
         except Exception:

@@ -1,0 +1,86 @@
+{
+  "case_id": "wikipedia-python",
+  "success": true,
+  "runner_success": true,
+  "verified_success": true,
+  "human_confirmed": false,
+  "outcome": "verified_success",
+  "failure_code": "decision_required",
+  "challenge_kind": "",
+  "handoff_required": false,
+  "final_scene_version": 37,
+  "final_frame_id": "",
+  "attempts": 3,
+  "max_attempts": 4,
+  "action_count": 26,
+  "model_call_count": 5,
+  "model_error_count": 0,
+  "model_tokens": 4524,
+  "compile_call_count": 1,
+  "grounding_call_count": 4,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "selected_text": "Python (programming language) 3a 119 languages ~",
+  "failure": "",
+  "actions": [
+    "ActionRecord(kind='capture', detail='pre_navigate v=32', ok=True)",
+    "ActionRecord(kind='focus', detail='linux at DuckDuckGo - Chromium', ok=True)",
+    "ActionRecord(kind='key', detail='new_tab', ok=True)",
+    "ActionRecord(kind='click', detail='omnibox', ok=True)",
+    "ActionRecord(kind='key', detail='focus_location', ok=True)",
+    "ActionRecord(kind='key', detail='select_all', ok=True)",
+    "ActionRecord(kind='type', detail='url', ok=True)",
+    "ActionRecord(kind='key', detail='Enter', ok=True)",
+    "ActionRecord(kind='capture', detail='navigate_settle v=33', ok=True)",
+    "ActionRecord(kind='settle', detail='navigate_settle', ok=True)",
+    "ActionRecord(kind='capture', detail='attempt-1 v=34', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='none', ok=False)",
+    "ActionRecord(kind='decision', detail='no_model_decision', ok=False)",
+    "ActionRecord(kind='capture', detail='attempt-2 v=35', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='decision', detail='none', ok=False)",
+    "ActionRecord(kind='decision', detail='no_model_decision', ok=False)",
+    "ActionRecord(kind='capture', detail='attempt-3 v=36', ok=True)",
+    "ActionRecord(kind='model', detail='minimax/MiniMax-M3', ok=True)",
+    "ActionRecord(kind='click', detail='Python (programming language) 3a 119 languages ~', ok=True)",
+    "ActionRecord(kind='capture', detail='post_click v=37', ok=True)",
+    "ActionRecord(kind='settle', detail='post_click', ok=True)",
+    "ActionRecord(kind='evidence_detail', detail='reanalysis_fallback scene=37 frame=sandbox-shopping-1787424474355750018 elements=x11:14680068,ocr_line_1', ok=True)",
+    "ActionRecord(kind='reanalysis', detail='evidence_fallback', ok=True)",
+    "ActionRecord(kind='evidence_detail', detail='post_action scene=37 frame=sandbox-shopping-1787424474355750018 elements=x11:14680068,ocr_line_1', ok=True)"
+  ],
+  "ai_calls": [
+    "AiCallRecord(call_number=25, purpose='plan_compile', model='MiniMax-M3', prompt_length=856, provider='minimax', response_tokens=745, latency_ms=3296, error='')",
+    "AiCallRecord(call_number=26, purpose='action_decision', model='MiniMax-M3', prompt_length=2349, provider='minimax', response_tokens=933, latency_ms=2152, error='')",
+    "AiCallRecord(call_number=27, purpose='action_decision', model='MiniMax-M3', prompt_length=2349, provider='minimax', response_tokens=952, latency_ms=1510, error='')",
+    "AiCallRecord(call_number=28, purpose='action_decision', model='MiniMax-M3', prompt_length=2349, provider='minimax', response_tokens=945, latency_ms=3136, error='')",
+    "AiCallRecord(call_number=29, purpose='post_action_reanalysis', model='MiniMax-M3', prompt_length=1952, provider='minimax', response_tokens=949, latency_ms=2122, error='')"
+  ],
+  "evidence_status": "satisfied",
+  "evidence_scene_version": 37,
+  "evidence_frame_id": "sandbox-shopping-1787424474355750018",
+  "evidence_tokens": [
+    "Python (programming language)",
+    "general-purpose programming language"
+  ],
+  "evidence_element_ids": [
+    "x11:14680068",
+    "ocr_line_1"
+  ],
+  "stale_rejection_count": 0,
+  "reanalysis_count": 1,
+  "elapsed_ms": 22003,
+  "attempts_detail": [
+    "AttemptRecord(attempt=1, scene_version_start=34, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=False, model_call_start=25, model_call_end=26, failure='decision_required')",
+    "AttemptRecord(attempt=2, scene_version_start=35, selected_target='', action_ok=False, post_scene_version=0, reanalysis_ok=False, verification_satisfied=False, model_call_start=26, model_call_end=27, failure='decision_required')",
+    "AttemptRecord(attempt=3, scene_version_start=36, selected_target='ocr_line_1', action_ok=True, post_scene_version=37, reanalysis_ok=True, verification_satisfied=True, model_call_start=27, model_call_end=29, failure='')"
+  ],
+  "artifact_manifest": [
+    "artifacts/test-runs/current-10-case-s5a-20260822/wikipedia-python-evidence.png",
+    "artifacts/test-runs/current-10-case-s5a-20260822/wikipedia-python.json"
+  ],
+  "decision_diagnostics": [
+    "reanalysis scene=37: ValueError: reason_code must be a string"
+  ]
+}

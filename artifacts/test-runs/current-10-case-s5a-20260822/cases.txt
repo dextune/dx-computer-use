@@ -1,0 +1,10 @@
+coupang-fresh-popular
+google-search-notebook
+youtube-search-lofi
+wikipedia-seoul
+bbc-news
+duckduckgo-linux
+github-explore
+wikipedia-python
+mdn-javascript
+example-org
