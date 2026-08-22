@@ -2,7 +2,8 @@
 
 The compiler never invents selectors, current element IDs, or coordinates.
 Surface-specific target roles arrive through :class:`PlanningContext`; the
-compiler only emits a capability-checked runtime graph.
+compiler emits one capability-checked graph with each independent evidence
+requirement assigned to exactly one node.
 """
 
 from __future__ import annotations
@@ -21,9 +22,14 @@ from hpcu.schemas.plan import (
 )
 from hpcu.schemas.strategy import StrategyPlan
 
+Compiler = Callable[
+    [GoalEnvelope, StrategyPlan, PlanningContext],
+    tuple[dict[str, PlanNode], str],
+]
+
 
 class PlanCompiler:
-    compiler_version = "2"
+    compiler_version = "3"
 
     def compile(
         self,
@@ -38,10 +44,7 @@ class PlanCompiler:
         if strategy.route == "tool_action":
             nodes, entry = self._compile_tool(goal, strategy, context)
         else:
-            compilers: dict[
-                IntentKind,
-                Callable[[GoalEnvelope, StrategyPlan, PlanningContext], tuple[dict[str, PlanNode], str]],
-            ] = {
+            compilers: dict[IntentKind, Compiler] = {
                 IntentKind.NAVIGATE: self._compile_navigate,
                 IntentKind.SEARCH: self._compile_search,
                 IntentKind.SELECT: self._compile_select,
@@ -51,6 +54,7 @@ class PlanCompiler:
             }
             nodes, entry = compilers[goal.intent](goal, strategy, context)
         self._validate_ops(goal, context, nodes)
+        self._validate_evidence(goal, nodes)
         return PlanIR(
             goal=goal,
             strategy_id=strategy.id,
@@ -116,6 +120,28 @@ class PlanCompiler:
                 )
 
     @staticmethod
+    def _validate_evidence(
+        goal: GoalEnvelope,
+        nodes: dict[str, PlanNode],
+    ) -> None:
+        assigned = tuple(
+            requirement
+            for node in nodes.values()
+            for requirement in node.evidence_requirements
+        )
+        if len(assigned) != len(set(assigned)):
+            raise ValueError("each evidence requirement must be assigned once")
+        expected = set(goal.evidence_requirements)
+        actual = set(assigned)
+        if actual != expected:
+            missing = sorted(expected - actual)
+            extra = sorted(actual - expected)
+            raise ValueError(
+                "compiled evidence contract does not match GoalEnvelope: "
+                f"missing={missing!r}, extra={extra!r}"
+            )
+
+    @staticmethod
     def _query_text(goal: GoalEnvelope) -> str:
         values = goal.entity_values("search_query")
         if len(values) != 1:
@@ -139,6 +165,16 @@ class PlanCompiler:
         if len(values) > 1:
             raise ValueError("edit planning accepts one replacement value")
         return context.require_value("replacement_value")
+
+    @staticmethod
+    def _evidence(goal: GoalEnvelope, *requirements: str) -> tuple[str, ...]:
+        expected = set(goal.evidence_requirements)
+        missing = set(requirements) - expected
+        if missing:
+            raise ValueError(
+                f"goal evidence contract is missing {sorted(missing)!r}"
+            )
+        return tuple(requirements)
 
     def _compile_navigate(
         self,
@@ -197,7 +233,7 @@ class PlanCompiler:
                 action=self._assert_visible("verify-destination"),
                 surface=strategy.surface,
                 target_query=destination,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(goal, "surface_identity"),
             ),
         }
         return nodes, "inspect-surface"
@@ -248,6 +284,7 @@ class PlanCompiler:
                 target_query=search_field,
                 grounding_hints=hints,
                 success_edge="submit-query",
+                evidence_requirements=self._evidence(goal, "query_echo"),
             ),
             "submit-query": PlanNode(
                 id="submit-query",
@@ -266,7 +303,8 @@ class PlanCompiler:
                 target_query=search_field,
                 verification_query=search_result,
                 grounding_hints=GroundingHints(
-                    tokens=(query_text,), source="goal"
+                    tokens=(query_text,),
+                    source="goal",
                 ),
                 success_edge="verify-result",
             ),
@@ -275,7 +313,7 @@ class PlanCompiler:
                 action=self._assert_visible("verify-result"),
                 surface=strategy.surface,
                 target_query=search_result,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(goal, "result_candidate"),
             ),
         }
         return nodes, "focus-search"
@@ -336,7 +374,7 @@ class PlanCompiler:
                 ),
                 surface=strategy.surface,
                 target_query=selected_state,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(goal, "selected_state"),
             ),
         }
         return nodes, "inspect-candidate"
@@ -363,6 +401,7 @@ class PlanCompiler:
                 surface=strategy.surface,
                 target_query=first,
                 success_edge="read-candidate-b",
+                evidence_requirements=self._evidence(goal, "candidate_a"),
             ),
             "read-candidate-b": PlanNode(
                 id="read-candidate-b",
@@ -376,7 +415,7 @@ class PlanCompiler:
                 action=self._assert_visible("verify-comparison"),
                 surface=strategy.surface,
                 target_query=second,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(goal, "candidate_b"),
             ),
         }
         return nodes, "read-candidate-a"
@@ -404,6 +443,7 @@ class PlanCompiler:
                 surface=strategy.surface,
                 target_query=target,
                 success_edge="replace-value",
+                evidence_requirements=self._evidence(goal, "old_value"),
             ),
             "replace-value": PlanNode(
                 id="replace-value",
@@ -439,7 +479,7 @@ class PlanCompiler:
                 ),
                 surface=strategy.surface,
                 target_query=edited,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(goal, "edited_value"),
             ),
         }
         return nodes, "inspect-edit-target"
@@ -501,7 +541,10 @@ class PlanCompiler:
                 action=self._assert_visible("verify-submission"),
                 surface=strategy.surface,
                 target_query=confirmation,
-                evidence_requirements=goal.evidence_requirements,
+                evidence_requirements=self._evidence(
+                    goal,
+                    "submission_confirmation",
+                ),
             ),
         }
         return nodes, "inspect-form"
