@@ -119,3 +119,13 @@ def test_task_budget_changes_plan_hash():
     )
 
     assert first.plan_hash != second.plan_hash
+
+
+def test_unresolved_slots_change_plan_hash():
+    first = _plan()
+    second = replace(
+        first,
+        goal=replace(first.goal, ambiguity_slots=("missing_target",)),
+    )
+
+    assert first.plan_hash != second.plan_hash
