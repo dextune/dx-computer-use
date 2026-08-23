@@ -203,6 +203,7 @@ def _build_compile_prompt(goal: str, start_url: str) -> str:
         "- blocked_any: array of strings for access-control screens\n"
         "- ignore_any: array of strings to exclude from target matching\n\n"
         "Use short observed-text candidates. All eight fields are required. "
+        "Array entries must be non-empty after trimming. "
         "Never use null, markdown, prose, or a second JSON object.\n"
         '{"ready_any":[],"success_any":[],"forbid_any":[],'
         '"pick_query":"","pick_required":true,"dismiss_any":[],'
@@ -225,7 +226,7 @@ def _pack_from_json(goal_id: str, payload: dict) -> TargetingPack:
         ready_any=tuple(_list_field(payload, "ready_any")),
         success_any=tuple(_list_field(payload, "success_any")),
         forbid_any=tuple(_list_field(payload, "forbid_any")),
-        pick_query=pick_query,
+        pick_query=pick_query.strip(),
         pick_required=pick_required,
         dismiss_any=tuple(_list_field(payload, "dismiss_any")),
         blocked_any=tuple(_list_field(payload, "blocked_any")),
@@ -237,6 +238,12 @@ def _list_field(payload: dict, key: str) -> list[str]:
     value = payload[key]
     if not isinstance(value, list):
         raise ValueError(f"{key} must be an array of strings")
-    if any(not isinstance(item, str) for item in value):
-        raise ValueError(f"{key} must contain strings only")
-    return value
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"{key} must contain strings only")
+        stripped = item.strip()
+        if not stripped:
+            raise ValueError(f"{key} must contain non-empty strings only")
+        normalized.append(stripped)
+    return normalized
