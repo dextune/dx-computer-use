@@ -107,7 +107,7 @@ def test_retry_cannot_exceed_task_model_call_budget():
     gateway = BudgetedGateway(
         retrying,
         ledger,
-        monotonic=_Clock(10.0, 10.1),
+        monotonic=_Clock(10.0, 10.5),
     )
 
     # When / Then
@@ -116,7 +116,7 @@ def test_retry_cannot_exceed_task_model_call_budget():
     assert inner.attempts == 1
     assert ledger.model_calls == 1
     assert ledger.calls_by_purpose[ModelCallPurpose.PLAN_COMPILE] == 1
-    assert ledger.latency_ms == 99
+    assert ledger.latency_ms == 500
 
 
 def test_retry_attempts_are_counted_through_logical_wrapper():
@@ -132,7 +132,7 @@ def test_retry_attempts_are_counted_through_logical_wrapper():
     gateway = BudgetedGateway(
         _TransparentGateway(retrying),
         ledger,
-        monotonic=_Clock(20.0, 20.2),
+        monotonic=_Clock(20.0, 20.5),
     )
 
     # When
@@ -144,7 +144,7 @@ def test_retry_attempts_are_counted_through_logical_wrapper():
     assert ledger.model_calls == 2
     assert ledger.calls_by_purpose[ModelCallPurpose.PLAN_COMPILE] == 2
     assert ledger.tokens_used == 7
-    assert ledger.latency_ms == 199
+    assert ledger.latency_ms == 500
 
 
 def test_failed_provider_call_accounts_local_elapsed_time():
@@ -171,7 +171,7 @@ def test_reported_latency_is_used_when_greater_than_observed():
     gateway = BudgetedGateway(
         inner,
         ledger,
-        monotonic=_Clock(40.0, 40.01),
+        monotonic=_Clock(40.0, 40.1),
     )
 
     # When
@@ -195,7 +195,7 @@ def test_retry_attempt_hook_does_not_leak_after_budgeted_call():
     gateway = BudgetedGateway(
         retrying,
         ledger,
-        monotonic=_Clock(50.0, 50.01),
+        monotonic=_Clock(50.0, 50.5),
     )
 
     # When
