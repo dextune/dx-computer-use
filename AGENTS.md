@@ -28,6 +28,7 @@ Windows, Linux(호스트·Docker), macOS, 브라우저, VNC는 플러그인이�
 14. **CAPTCHA·로그인·보안 확인은 우회하지 않는다.** solver, refresh 반복, alternate site/endpoint, credential 입력으로 접근 통제를 피하지 않고 `BLOCKED`/`HUMAN_HANDOFF`로 중단한다.
 15. **터미널 AI 코딩은 격리된 화면 테스트일 뿐이다.** OpenCode는 terminal 안에서 사용자가 물리 입력으로 실행하도록 테스트할 수 있지만 HPCU의 semantic decision-maker가 아니다. sandbox/worktree 밖 파일·secret·destructive command를 사용하지 않는다.
 16. **테스트 성공을 위해 케이스별 정답을 하드코딩하지 않는다.** goal/fixtures 이외의 site·CTA·OCR·좌표·광고·challenge 문자열, 정답 element ID를 production action path에 추가하지 않는다.
+17. **개발 작업용 별도 Git 브랜치를 만들지 않는다.** 코드·문서·테스트 변경은 항상 `main`에서 직접 수행하고, 작업용 branch/worktree 생성·전환·푸시를 금지한다. 이미 존재하는 별도 브랜치의 변경이 있다면 새 브랜치를 만들지 말고 검증 후 `main`에 직접 통합한다.
 
 ---
 
@@ -127,6 +128,9 @@ Structure (OS) ↗                         ↓
 
 ## 작업 방식
 
+- **항상 `main`에서 직접 작업한다. 별도 개발 브랜치·임시 브랜치·worktree를 만들거나 사용하지 않는다.**
+- Git 작업 시작 전 현재 branch가 `main`인지 확인하고, 아니라면 새 branch를 만들지 말고 `main`으로 복귀한 뒤 작업한다.
+- 커밋과 원격 반영 대상은 `main` 하나로 고정한다. 사용자가 명시적으로 다른 저장소 정책을 지시하지 않는 한 PR용 branch도 만들지 않는다.
 - 할 일: `docs/plan/tasklist.md` — 설계를 여기서 바꾸지 않는다.
 - `[x]`는 테스트로 증명된 것만.
 - 문서 맵(한 주제 한 곳): `docs/plan/00-overview-and-goals.md` §1.1.
