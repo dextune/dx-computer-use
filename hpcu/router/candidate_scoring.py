@@ -125,8 +125,8 @@ def _score_element(element: UIElement, query: TargetQuery) -> ScoredCandidate:
     source = _source_reliability(element)
     structure = _structure_match(element)
 
-    # An empty query carries no targeting information. Source/structure quality
-    # must never be allowed to turn it into an executable candidate.
+    # Defensive fallback for callers inside this module. Public scoring rejects
+    # an empty query before candidates are created at all.
     if not normalized_text and not requested_role:
         score = 0.0
     else:
@@ -174,6 +174,9 @@ def score_candidates(
     """
     if not isinstance(target_query, TargetQuery):
         target_query = TargetQuery(text=str(target_query or ""))
+
+    if not _normalize(target_query.text) and not (target_query.role or "").strip():
+        return []
 
     scored: list[ScoredCandidate] = []
     for element in candidates:
