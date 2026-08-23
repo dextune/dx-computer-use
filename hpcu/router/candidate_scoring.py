@@ -82,11 +82,12 @@ def _text_match(element: UIElement, query_text: str) -> float:
 
 
 def _role_match(element: UIElement, query: TargetQuery) -> float:
-    if not query.role:
+    requested_role = (query.role or "").strip().lower()
+    if not requested_role:
         return 0.5  # neutral — role was not requested
     if element.role == "unknown":
         return 0.0
-    return 1.0 if element.role.lower() == query.role.strip().lower() else 0.0
+    return 1.0 if element.role.lower() == requested_role else 0.0
 
 
 def _source_reliability(element: UIElement) -> float:
@@ -117,32 +118,37 @@ def _clamp(value: float) -> float:
 
 
 def _score_element(element: UIElement, query: TargetQuery) -> ScoredCandidate:
+    normalized_text = _normalize(query.text)
+    requested_role = (query.role or "").strip()
     text = _text_match(element, query.text)
     role = _role_match(element, query)
     source = _source_reliability(element)
     structure = _structure_match(element)
 
-    # When the query has no text, the text weight is redistributed to the
-    # other factors so that role-only queries (e.g. "find the window") can
-    # still reach the confidence threshold.  Without this, a pure-role query
-    # is capped at ~0.55 which is below the 0.88 execute threshold.
-    if not _normalize(query.text):
-        text_weight = 0.0
-        role_weight = ROLE_WEIGHT + TEXT_WEIGHT * 0.50
-        source_weight = SOURCE_WEIGHT + TEXT_WEIGHT * 0.34
-        structure_weight = STRUCTURE_WEIGHT + TEXT_WEIGHT * 0.16
+    # An empty query carries no targeting information. Source/structure quality
+    # must never be allowed to turn it into an executable candidate.
+    if not normalized_text and not requested_role:
+        score = 0.0
     else:
-        text_weight = TEXT_WEIGHT
-        role_weight = ROLE_WEIGHT
-        source_weight = SOURCE_WEIGHT
-        structure_weight = STRUCTURE_WEIGHT
+        # When the query is role-only, redistribute text weight to the other
+        # factors so a strong structural match can reach the local threshold.
+        if not normalized_text:
+            text_weight = 0.0
+            role_weight = ROLE_WEIGHT + TEXT_WEIGHT * 0.50
+            source_weight = SOURCE_WEIGHT + TEXT_WEIGHT * 0.34
+            structure_weight = STRUCTURE_WEIGHT + TEXT_WEIGHT * 0.16
+        else:
+            text_weight = TEXT_WEIGHT
+            role_weight = ROLE_WEIGHT
+            source_weight = SOURCE_WEIGHT
+            structure_weight = STRUCTURE_WEIGHT
 
-    score = _clamp(
-        text * text_weight
-        + role * role_weight
-        + source * source_weight
-        + structure * structure_weight
-    )
+        score = _clamp(
+            text * text_weight
+            + role * role_weight
+            + source * source_weight
+            + structure * structure_weight
+        )
     reason = (
         f"text={text:.2f};role={role:.2f};"
         f"source={source:.2f};structure={structure:.2f}"
