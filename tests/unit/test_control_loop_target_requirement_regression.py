@@ -36,3 +36,24 @@ def test_explicit_element_binding_requires_target_without_query():
     )
 
     assert ControlLoop._requires_target(None, action) is True
+
+
+@pytest.mark.parametrize(
+    "op",
+    (
+        ActionOp.INVOKE,
+        ActionOp.NAVIGATE,
+        ActionOp.CLICK,
+        ActionOp.DOUBLE_CLICK,
+        ActionOp.RIGHT_CLICK,
+        ActionOp.TYPE,
+        ActionOp.REPLACE_TEXT,
+        ActionOp.SELECT,
+        ActionOp.TOGGLE,
+        ActionOp.DRAG,
+    ),
+)
+def test_intrinsically_targeted_actions_fail_closed_without_binding(op):
+    action = Action(id=op.value, op=op, value="value")
+
+    assert ControlLoop._requires_target(None, action) is True
