@@ -247,6 +247,7 @@ class PlanIR:
     def plan_hash(self) -> str:
         payload = {
             "goal": self.goal.canonical_hash,
+            "ambiguity_slots": list(self.goal.ambiguity_slots),
             "strategy": self.strategy_id,
             "entry": self.entry_node_id,
             "nodes": [_node_payload(self.nodes[key]) for key in sorted(self.nodes)],
