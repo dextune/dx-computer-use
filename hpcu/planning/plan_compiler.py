@@ -73,6 +73,7 @@ class PlanCompiler:
         search_box: TargetQuerySpec,
         result_target: TargetQuerySpec,
         task_budget: TaskBudgetSpec | None = None,
+        blocked_tokens: tuple[str, ...] = (),
     ) -> PlanIR:
         """Compatibility adapter for the original search-only public API."""
         return self.compile(
@@ -82,7 +83,8 @@ class PlanCompiler:
                 target_queries={
                     "search_field": search_box,
                     "search_result": result_target,
-                }
+                },
+                blocked_tokens=blocked_tokens,
             ),
             task_budget,
         )
