@@ -65,6 +65,8 @@ class PlanningContext:
             raise ValueError("planning-context query names must be non-empty")
         if any(not key.strip() for key in values):
             raise ValueError("planning-context value names must be non-empty")
+        if any(not token.strip() for token in self.blocked_tokens):
+            raise ValueError("blocked_tokens must not contain empty strings")
         object.__setattr__(self, "target_queries", MappingProxyType(queries))
         object.__setattr__(self, "values", MappingProxyType(values))
         object.__setattr__(self, "allowed_ops", frozenset(self.allowed_ops))
@@ -152,6 +154,8 @@ class PlanIR:
         nodes = dict(self.nodes)
         if not self.strategy_id.strip() or not self.compiler_version.strip():
             raise ValueError("strategy_id and compiler_version are required")
+        if any(not token.strip() for token in self.blocked_tokens):
+            raise ValueError("blocked_tokens must not contain empty strings")
         if self.entry_node_id not in nodes:
             raise ValueError("entry_node_id must reference an existing node")
         for key, node in nodes.items():

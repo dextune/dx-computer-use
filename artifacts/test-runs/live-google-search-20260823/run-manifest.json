@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source_revision": "d4aebcd6a5cee5233be61b3b4a73b2adc3017407",
+  "entrypoint": "hpcu/cases/__main__.py",
+  "python_version": "3.12.3",
+  "cases_argument": ".tmp-google-search-notebook-live.yaml",
+  "limit": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "case_count": 1,
+  "case_ids": [
+    "google-search-notebook"
+  ],
+  "case_contract_sha256": "54f969a05746193f4cf50d0a799c22b483a44e172008d97d0b7b1c625e49a097",
+  "runtime_config_sha256": "291297f8619c64bc0c59cf0d129954d318051a43504d1e144993d41ad0b922ed",
+  "cases": [
+    {
+      "id": "google-search-notebook",
+      "goal": "구글에서 노트북을 검색해줘",
+      "start_url": "https://www.google.com/",
+      "surface": "browser",
+      "entry": {
+        "kind": "url",
+        "value": "https://www.google.com/"
+      },
+      "require_pick": false,
+      "max_attempts": 4,
+      "max_model_calls": 2
+    }
+  ]
+}

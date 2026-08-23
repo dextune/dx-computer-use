@@ -1,0 +1,6 @@
+cases:
+  - id: google-search-notebook
+    goal: "구글에서 노트북을 검색해줘"
+    start_url: "https://www.google.com/"
+    max_attempts: 4
+    max_model_calls: 2

@@ -1,0 +1,6 @@
+cases:
+  - id: duckduckgo-linux
+    goal: "DuckDuckGo에서 linux를 검색해줘"
+    start_url: "https://duckduckgo.com/?q=linux"
+    max_attempts: 4
+    max_model_calls: 2

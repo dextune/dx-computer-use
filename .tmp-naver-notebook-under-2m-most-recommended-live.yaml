@@ -1,0 +1,6 @@
+cases:
+  - id: naver-notebook-under-2m-most-recommended
+    goal: "네이버 쇼핑에서 200만원 이하 노트북을 찾아 추천 수가 가장 많은 상품 하나를 선택해줘. 구매, 장바구니 추가, 결제, 로그인은 하지 마."
+    start_url: "https://search.shopping.naver.com/"
+    max_attempts: 5
+    max_model_calls: 12

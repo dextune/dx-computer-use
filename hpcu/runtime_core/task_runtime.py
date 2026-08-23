@@ -174,14 +174,29 @@ class TaskRuntime:
             node = current_plan.nodes[node_id]
 
             if current_plan.blocked_tokens:
-                await self.control_loop._observe_scene()
-                scene = self.control_loop.scene
+                if last is not None and last.scene.version > 0:
+                    scene = last.scene
+                else:
+                    try:
+                        await self.control_loop._observe_scene()
+                    except Exception:
+                        return self._commit_terminal(
+                            status=TaskStatus.FAILED,
+                            node_id=node_id,
+                            steps=step_number,
+                            last_step=last,
+                            failure_code=FailureCode.CAPTURE_BACKEND_UNAVAILABLE.value,
+                            completed=completed,
+                            evidence=evidence,
+                            plan=current_plan,
+                        )
+                    scene = self.control_loop.scene
                 blob = " ".join(
                     (element.text or element.name or "")
                     for element in scene.elements.values()
-                ).casefold().replace(" ", "")
+                )
                 if any(
-                    token.casefold().replace(" ", "") in blob
+                    re.search(r"\b" + re.escape(token) + r"\b", blob, re.IGNORECASE)
                     for token in current_plan.blocked_tokens
                 ):
                     return self._commit_terminal(

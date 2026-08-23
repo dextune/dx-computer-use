@@ -126,7 +126,7 @@ def _score_element(element: UIElement, query: TargetQuery) -> ScoredCandidate:
     # other factors so that role-only queries (e.g. "find the window") can
     # still reach the confidence threshold.  Without this, a pure-role query
     # is capped at ~0.55 which is below the 0.88 execute threshold.
-    if not query.text:
+    if not _normalize(query.text):
         text_weight = 0.0
         role_weight = ROLE_WEIGHT + TEXT_WEIGHT * 0.50
         source_weight = SOURCE_WEIGHT + TEXT_WEIGHT * 0.34

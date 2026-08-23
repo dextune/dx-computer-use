@@ -3,6 +3,8 @@
 All T1 components — model 0 call, pure data, pure string processing.
 """
 
+import json
+
 import pytest
 
 from hpcu.cases.stats import DEFAULT_PROVIDER_ID, CountingGateway
@@ -410,3 +412,36 @@ def test_compiler_non_dict_response_fails_closed():
         compiler.compile("case-1", "쿠팡에서 생수 골라줘")
 
     assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
+
+
+@pytest.mark.unit
+def test_compiler_handles_nested_wrapper_object():
+    """When MiniMax wraps the targeting payload in an envelope with extra keys,
+    the compiler selects the inner object via allowed_keys tie-breaking."""
+    inner_payload = {
+        "ready_any": ["ready"],
+        "success_any": ["success"],
+        "forbid_any": [],
+        "pick_query": "correct",
+        "pick_required": True,
+        "dismiss_any": [],
+        "blocked_any": [],
+        "ignore_any": ["ad"],
+    }
+    # Outer wrapper also has all required keys, creating ambiguity.
+    # Without allowed_keys both objects match; with allowed_keys the
+    # inner object is preferred because its keys are a subset.
+    wrapper = dict(inner_payload)
+    wrapper["extra_context"] = "some reasoning text"
+    wrapper["inner"] = inner_payload
+    inner = _FakeGateway(
+        content=json.dumps(wrapper),
+    )
+    gateway = CountingGateway(inner)
+    compiler = TargetingCompiler(gateway)
+    pack = compiler.compile("case-1", "test goal")
+    assert pack.source == "model"
+    assert pack.ready_any == ("ready",)
+    assert pack.pick_query == "correct"
+    assert pack.ignore_any == ("ad",)
+    assert pack.pick_required is True

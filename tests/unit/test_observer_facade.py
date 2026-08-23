@@ -247,6 +247,9 @@ class _FakePerception:
             ),
         )
 
+    async def elements_from_frame_async(self, frame, scene_version, roi=None):
+        return self.elements_from_frame(frame, scene_version, roi=roi)
+
 
 @pytest.mark.unit
 async def test_observe_merges_injected_perception_elements():

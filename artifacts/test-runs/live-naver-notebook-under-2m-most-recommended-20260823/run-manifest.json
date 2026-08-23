@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source_revision": "d4aebcd6a5cee5233be61b3b4a73b2adc3017407",
+  "entrypoint": "hpcu/cases/__main__.py",
+  "python_version": "3.12.3",
+  "cases_argument": ".tmp-naver-notebook-under-2m-most-recommended-live.yaml",
+  "limit": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "case_count": 1,
+  "case_ids": [
+    "naver-notebook-under-2m-most-recommended"
+  ],
+  "case_contract_sha256": "49ff6329f4bb9c439527d4620485d7833b4ac072d5fee5daae8f8d2970a407dc",
+  "runtime_config_sha256": "4027d7bf8792edf344e76dc43df01ed8380be52849b7a9abeb04f01a62afe59c",
+  "cases": [
+    {
+      "id": "naver-notebook-under-2m-most-recommended",
+      "goal": "네이버 쇼핑에서 200만원 이하 노트북을 찾아 추천 수가 가장 많은 상품 하나를 선택해줘. 구매, 장바구니 추가, 결제, 로그인은 하지 마.",
+      "start_url": "https://search.shopping.naver.com/",
+      "surface": "browser",
+      "entry": {
+        "kind": "url",
+        "value": "https://search.shopping.naver.com/"
+      },
+      "require_pick": false,
+      "max_attempts": 5,
+      "max_model_calls": 12
+    }
+  ]
+}

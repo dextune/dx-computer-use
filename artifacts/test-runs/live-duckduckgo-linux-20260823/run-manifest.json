@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "source_revision": "d4aebcd6a5cee5233be61b3b4a73b2adc3017407",
+  "entrypoint": "hpcu/cases/__main__.py",
+  "python_version": "3.12.3",
+  "cases_argument": ".tmp-duckduckgo-linux-live.yaml",
+  "limit": 0,
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "case_count": 1,
+  "case_ids": [
+    "duckduckgo-linux"
+  ],
+  "case_contract_sha256": "6e3187b215bf0b91b1d5aaa0727523dd4143f9492dbfe59b1bbc02a9694b02e1",
+  "runtime_config_sha256": "291297f8619c64bc0c59cf0d129954d318051a43504d1e144993d41ad0b922ed",
+  "cases": [
+    {
+      "id": "duckduckgo-linux",
+      "goal": "DuckDuckGo에서 linux를 검색해줘",
+      "start_url": "https://duckduckgo.com/?q=linux",
+      "surface": "browser",
+      "entry": {
+        "kind": "url",
+        "value": "https://duckduckgo.com/?q=linux"
+      },
+      "require_pick": false,
+      "max_attempts": 4,
+      "max_model_calls": 2
+    }
+  ]
+}

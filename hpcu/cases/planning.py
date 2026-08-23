@@ -109,6 +109,7 @@ class CasePlanCompiler(PlanCompiler):
             task_budget=plan.task_budget,
             compiler_version=f"{plan.compiler_version}-case-entry",
             patch_lineage=plan.patch_lineage,
+            blocked_tokens=plan.blocked_tokens,
         )
 
 

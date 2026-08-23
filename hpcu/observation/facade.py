@@ -22,6 +22,9 @@ from hpcu.schemas.ui_element import UIElement
 @dataclass
 class _Metric:
     count: int = 0
+    total_latency_ms: int = 0
+    error_count: int = 0
+    timeout_count: int = 0
 
 
 @dataclass
@@ -32,10 +35,23 @@ class PerformanceSnapshot:
 
     def as_dict(self) -> dict:
         return {
-            "capture": {"count": self.capture.count},
-            "structure": {"count": self.structure.count},
+            "capture": {
+                "count": self.capture.count,
+                "total_latency_ms": self.capture.total_latency_ms,
+                "error_count": self.capture.error_count,
+                "timeout_count": self.capture.timeout_count,
+            },
+            "structure": {
+                "count": self.structure.count,
+                "total_latency_ms": self.structure.total_latency_ms,
+                "error_count": self.structure.error_count,
+                "timeout_count": self.structure.timeout_count,
+            },
             "capture_structure_transaction": {
                 "count": self.capture_structure_transaction.count,
+                "total_latency_ms": self.capture_structure_transaction.total_latency_ms,
+                "error_count": self.capture_structure_transaction.error_count,
+                "timeout_count": self.capture_structure_transaction.timeout_count,
             },
         }
 
@@ -79,26 +95,47 @@ class CompositeObserver(Observer):
         timeout_ms = None
         if self._config is not None:
             performance = self._config.get("performance", {})
+            if not isinstance(performance, dict):
+                performance = {}
             timeout_ms = performance.get("observe_timeout_ms")
 
         if timeout_ms is not None:
-            try:
-                result = await asyncio.wait_for(
-                    self._observe_transaction(),
-                    timeout=timeout_ms / 1000.0,
-                )
-            except asyncio.TimeoutError:
-                raise TimeoutError("observation transaction timed out") from None
+            if not isinstance(timeout_ms, (int, float)):
+                timeout_ms = None
+
+        t0 = asyncio.get_running_loop().time() * 1000
+        try:
+            if timeout_ms is not None:
+                try:
+                    result = await asyncio.wait_for(
+                        self._observe_transaction(),
+                        timeout=timeout_ms / 1000.0,
+                    )
+                except asyncio.TimeoutError:
+                    self.performance_snapshot.capture_structure_transaction.timeout_count += 1
+                    raise asyncio.TimeoutError("observation transaction timed out") from None
+            else:
+                result = await self._observe_transaction()
+        except asyncio.TimeoutError:
+            raise
+        except Exception:
+            self.performance_snapshot.capture_structure_transaction.error_count += 1
+            raise
         else:
-            result = await self._observe_transaction()
+            elapsed = int(asyncio.get_running_loop().time() * 1000 - t0)
+            self.performance_snapshot.capture_structure_transaction.total_latency_ms += elapsed
         return result
 
     async def _observe_transaction(self) -> SceneDelta:
         """Grab frame and read structure in parallel, then build delta."""
         frame_task = asyncio.create_task(self._grab_frame())
         structure_task = asyncio.create_task(self._read_structure())
-
-        frame, current = await asyncio.gather(frame_task, structure_task)
+        try:
+            frame, current = await asyncio.gather(frame_task, structure_task)
+        except BaseException:
+            frame_task.cancel()
+            structure_task.cancel()
+            raise
 
         self.performance_snapshot.capture.count += 1
         self.performance_snapshot.structure.count += 1
@@ -106,11 +143,11 @@ class CompositeObserver(Observer):
 
         if self._perception is not None and frame is not None:
             roi = content_roi(primary_window(Scene(version=0, elements=current)))
-            perceived = self._perception.elements_from_frame(
+            perceived = await self._perception.elements_from_frame_async(
                 frame, self._version + 1, roi=roi
             )
             if not perceived and roi is not None:
-                perceived = self._perception.elements_from_frame(
+                perceived = await self._perception.elements_from_frame_async(
                     frame, self._version + 1, roi=None
                 )
             for element in perceived:

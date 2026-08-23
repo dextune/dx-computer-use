@@ -267,3 +267,77 @@ async def test_verification_grounding_preserves_cpu_failure_reason():
     assert result.failure_code == FailureCode.GROUNDING_CONFIDENCE_LOW.value
     assert injector.semantic_calls == ["login"]
     assert recorder.model_call_count == 0
+
+
+@pytest.mark.unit
+async def test_navigate_falls_back_to_top_ambiguous_candidate():
+    """NAVIGATE with GROUNDING_AMBIGUOUS selects the top candidate instead of skipping."""
+    ambiguous = _grounding(
+        None,
+        0.7,
+        failure_code=FailureCode.GROUNDING_AMBIGUOUS,
+        candidate_ids=("login", "other"),
+    )
+    loop, injector, recorder = _loop(
+        (_login_button(selected=False),),
+        (_login_button(selected=True),),
+        grounder=ScriptedGrounder(ambiguous),
+    )
+    action = Action(
+        id="s1",
+        op=ActionOp.NAVIGATE,
+        value="https://example.com",
+        postconditions=(
+            Postcondition(
+                kind=PostconditionKind.STATE_MATCHES,
+                target="$target",
+                value=1,
+            ),
+        ),
+    )
+    result = await loop.step({"text": "로그인"}, action)
+
+    assert result.success is True
+    assert result.skipped is False
+    assert result.grounding is not None
+    assert result.grounding.element_id == "login"
+    assert injector.semantic_calls == ["login"]
+    assert recorder.model_call_count == 0
+
+
+@pytest.mark.unit
+async def test_focus_window_bypasses_grounding_requirement():
+    """FOCUS_WINDOW without query or element_id proceeds without grounding failure."""
+    loop, _injector, _recorder = _loop((_login_button(),))
+    action = Action(id="s1", op=ActionOp.FOCUS_WINDOW)
+    result = await loop.step(None, action)
+
+    assert result.skipped is False
+    assert result.failure_code != FailureCode.GROUNDING_CONFIDENCE_LOW.value
+    assert result.failure_code != FailureCode.GROUNDING_NO_CANDIDATES.value
+    assert result.failure_code != FailureCode.GROUNDING_AMBIGUOUS.value
+
+
+class _SpyBreaker:
+    window_size = 4
+
+    def __init__(self) -> None:
+        self.reset_calls = 0
+
+    def reset(self) -> None:
+        self.reset_calls += 1
+
+
+@pytest.mark.unit
+def test_begin_task_resets_loop_breaker():
+    """begin_task() calls reset() on the configured loop breaker."""
+    breaker = _SpyBreaker()
+    loop = ControlLoop(
+        observer=object(),
+        grounder=object(),
+        executor=object(),
+        verifier=object(),
+        loop_breaker=breaker,
+    )
+    loop.begin_task()
+    assert breaker.reset_calls == 1

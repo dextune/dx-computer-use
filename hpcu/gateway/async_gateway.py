@@ -59,7 +59,7 @@ async def call_gateway_async(
             return await awaitable
         async with asyncio.timeout(timeout_ms / 1000.0):
             return await awaitable
-    except TimeoutError as error:
+    except asyncio.TimeoutError as error:
         raise AsyncGatewayTimeout(
             f"semantic provider exceeded {timeout_ms}ms task deadline"
         ) from error
