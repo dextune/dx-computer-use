@@ -73,6 +73,22 @@ class _Structure(StructureObserver):
         return StructureCapabilities(tree=Capability.SUPPORTED)
 
 
+class _SerialCapture(_Capture):
+    def __init__(self) -> None:
+        super().__init__()
+        self.active = 0
+        self.max_active = 0
+
+    async def grab(self) -> FrameHandle:
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        try:
+            await asyncio.sleep(0.01)
+            return await super().grab()
+        finally:
+            self.active -= 1
+
+
 @pytest.mark.asyncio
 async def test_capture_and_structure_start_in_parallel():
     rendezvous = _Rendezvous()
@@ -95,7 +111,8 @@ async def test_capture_and_structure_start_in_parallel():
 
 @pytest.mark.asyncio
 async def test_concurrent_observe_calls_serialize_scene_versions():
-    observer = CompositeObserver("session", _Capture(), _Structure())
+    capture = _SerialCapture()
+    observer = CompositeObserver("session", capture, _Structure())
 
     first, second = await asyncio.gather(
         observer.observe(),
@@ -104,21 +121,32 @@ async def test_concurrent_observe_calls_serialize_scene_versions():
 
     assert sorted((first.scene_version, second.scene_version)) == [1, 2]
     assert observer.capture_backend.frames == 2
+    assert capture.max_active == 1
 
 
 @pytest.mark.asyncio
 async def test_observation_timeout_cancels_transaction():
     class _BlockedCapture(_Capture):
+        def __init__(self) -> None:
+            super().__init__()
+            self.cancelled = asyncio.Event()
+
         async def grab(self) -> FrameHandle:
-            await asyncio.Event().wait()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                self.cancelled.set()
             raise AssertionError("unreachable")
 
+    capture = _BlockedCapture()
     observer = CompositeObserver(
         "session",
-        _BlockedCapture(),
+        capture,
         _Structure(),
         config={"performance": {"observe_timeout_ms": 1}},
     )
 
     with pytest.raises(TimeoutError, match="transaction"):
         await observer.observe()
+
+    assert capture.cancelled.is_set()
