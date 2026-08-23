@@ -61,6 +61,7 @@ class StepResult:
     post_scene_version: int | None = None
     loop_detection: LoopDetection | None = None
     recovery_action: RecoveryAction | None = None
+    action_attempted: bool = False
 
 
 class ControlLoop:
@@ -172,7 +173,17 @@ class ControlLoop:
         if action.op is ActionOp.WAIT_UNTIL:
             return await self._wait_until(query, action, pre_scene)
 
-        grounding = self._resolve_target(query, action, pre_scene)
+        try:
+            grounding = self._resolve_target(query, action, pre_scene)
+        except Exception as error:
+            failure = self._exception_failure_code(error, FailureCode.UNKNOWN)
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=failure.value,
+                skipped=True,
+                pre_scene_version=pre_scene.version,
+            )
         if self._requires_target(query, action) and (
             grounding is None or not grounding.confident
         ):
@@ -191,9 +202,28 @@ class ControlLoop:
         targeted = self._bind_target(action, element_id)
 
         if targeted.op in _LOCAL_VERIFY_OPS:
-            verified = self._verifier.verify_postconditions(
-                targeted.postconditions, pre_scene
-            )
+            try:
+                verified = self._verifier.verify_postconditions(
+                    targeted.postconditions, pre_scene
+                )
+            except Exception as error:
+                failure = self._exception_failure_code(
+                    error, FailureCode.VERIFICATION_FAILED
+                )
+                self._record(
+                    TraceEventType.VERIFICATION,
+                    pre_scene.version,
+                    failure_code=failure.value,
+                )
+                return StepResult(
+                    success=False,
+                    scene=pre_scene,
+                    failure_code=failure.value,
+                    skipped=True,
+                    grounding=grounding,
+                    pre_scene_version=pre_scene.version,
+                    post_scene_version=pre_scene.version,
+                )
             self._record(TraceEventType.VERIFICATION, pre_scene.version)
             return StepResult(
                 success=verified,
@@ -207,7 +237,11 @@ class ControlLoop:
                 post_scene_version=pre_scene.version,
             )
 
-        if not self._risk_engine.allow(targeted, pre_scene):
+        try:
+            allowed = self._risk_engine.allow(targeted, pre_scene)
+        except Exception:
+            allowed = False
+        if not allowed:
             if self._approval_gate is not None:
                 self._approval_gate.request_approval(
                     targeted,
@@ -227,14 +261,56 @@ class ControlLoop:
         physical_point = None
         if element is not None and element.bbox is not None:
             physical_point = compute_safe_click_point(element.bbox)
-        prepared = self._executor.prepare(
-            targeted,
-            element_id,
-            element=element,
-            physical_point=physical_point,
-            source_scene=pre_scene,
-        )
-        execution = await self._executor.execute(prepared, current_scene=pre_scene)
+        try:
+            prepared = self._executor.prepare(
+                targeted,
+                element_id,
+                element=element,
+                physical_point=physical_point,
+                source_scene=pre_scene,
+            )
+        except Exception as error:
+            failure = self._exception_failure_code(error, FailureCode.UNKNOWN)
+            self._record(
+                TraceEventType.ACTION,
+                pre_scene.version,
+                element_id=element_id,
+                failure_code=failure.value,
+                payload={"op": targeted.op.value, "phase": "prepare"},
+            )
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=failure.value,
+                skipped=True,
+                grounding=grounding,
+                pre_scene_version=pre_scene.version,
+            )
+
+        try:
+            execution = await self._executor.execute(
+                prepared, current_scene=pre_scene
+            )
+        except Exception as error:
+            failure = self._exception_failure_code(error, FailureCode.UNKNOWN)
+            self._record(
+                TraceEventType.ACTION,
+                pre_scene.version,
+                element_id=element_id,
+                failure_code=failure.value,
+                payload={"op": targeted.op.value, "phase": "execute"},
+            )
+            detection, recovery = self._remember_attempt(targeted, pre_scene)
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=self._failure_after_recovery(failure.value, recovery),
+                grounding=grounding,
+                pre_scene_version=pre_scene.version,
+                loop_detection=detection,
+                recovery_action=recovery,
+                action_attempted=True,
+            )
         self._record(
             TraceEventType.ACTION,
             pre_scene.version,
@@ -255,6 +331,7 @@ class ControlLoop:
                 pre_scene_version=pre_scene.version,
                 loop_detection=detection,
                 recovery_action=recovery,
+                action_attempted=True,
             )
 
         try:
@@ -273,14 +350,38 @@ class ControlLoop:
                 pre_scene_version=pre_scene.version,
                 loop_detection=detection,
                 recovery_action=recovery,
+                action_attempted=True,
             )
 
         verified_action = targeted
         verification_grounding = None
         if verification_query:
-            verification_grounding = self._grounder.resolve(
-                verification_query, post_scene
-            )
+            try:
+                verification_grounding = self._grounder.resolve(
+                    verification_query, post_scene
+                )
+            except Exception as error:
+                detection, recovery = self._remember_attempt(targeted, post_scene)
+                failure = self._exception_failure_code(
+                    error, FailureCode.VERIFICATION_FAILED
+                )
+                self._record(
+                    TraceEventType.VERIFICATION,
+                    post_scene.version,
+                    failure_code=failure.value,
+                )
+                return StepResult(
+                    success=False,
+                    scene=post_scene,
+                    failure_code=self._failure_after_recovery(failure.value, recovery),
+                    grounding=grounding,
+                    execution=execution,
+                    pre_scene_version=pre_scene.version,
+                    post_scene_version=post_scene.version,
+                    loop_detection=detection,
+                    recovery_action=recovery,
+                    action_attempted=True,
+                )
             if not verification_grounding.confident:
                 detection, recovery = self._remember_attempt(targeted, post_scene)
                 self._record(TraceEventType.VERIFICATION, post_scene.version)
@@ -300,14 +401,39 @@ class ControlLoop:
                     post_scene_version=post_scene.version,
                     loop_detection=detection,
                     recovery_action=recovery,
+                    action_attempted=True,
                 )
             verified_action = self._bind_verification_target(
                 targeted, verification_grounding.element_id
             )
 
-        verified = self._verifier.verify_transition(
-            verified_action, pre_scene, post_scene
-        )
+        try:
+            verified = self._verifier.verify_transition(
+                verified_action, pre_scene, post_scene
+            )
+        except Exception as error:
+            detection, recovery = self._remember_attempt(targeted, post_scene)
+            failure = self._exception_failure_code(
+                error, FailureCode.VERIFICATION_FAILED
+            )
+            self._record(
+                TraceEventType.VERIFICATION,
+                post_scene.version,
+                failure_code=failure.value,
+            )
+            return StepResult(
+                success=False,
+                scene=post_scene,
+                failure_code=self._failure_after_recovery(failure.value, recovery),
+                grounding=grounding,
+                execution=execution,
+                verification_grounding=verification_grounding,
+                pre_scene_version=pre_scene.version,
+                post_scene_version=post_scene.version,
+                loop_detection=detection,
+                recovery_action=recovery,
+                action_attempted=True,
+            )
         self._record(TraceEventType.VERIFICATION, post_scene.version)
         detection, recovery = self._remember_attempt(targeted, post_scene)
         if not verified:
@@ -324,6 +450,7 @@ class ControlLoop:
                 post_scene_version=post_scene.version,
                 loop_detection=detection,
                 recovery_action=recovery,
+                action_attempted=True,
             )
         return StepResult(
             success=True,
@@ -335,6 +462,7 @@ class ControlLoop:
             post_scene_version=post_scene.version,
             loop_detection=detection,
             recovery_action=recovery,
+            action_attempted=True,
         )
 
     async def run(
@@ -360,19 +488,38 @@ class ControlLoop:
         stable = 0
         last_grounding: GroundingResult | None = None
         while True:
-            last_grounding = self._resolve_target(query, action, scene)
-            element_id = (
-                last_grounding.element_id
-                if last_grounding is not None and last_grounding.confident
-                else action.target.element_id
-            )
-            targeted = self._bind_target(action, element_id)
-            holds = (
-                (not self._requires_target(query, action) or element_id is not None)
-                and self._verifier.verify_postconditions(
-                    targeted.postconditions, scene
+            try:
+                last_grounding = self._resolve_target(query, action, scene)
+                element_id = (
+                    last_grounding.element_id
+                    if last_grounding is not None and last_grounding.confident
+                    else action.target.element_id
                 )
-            )
+                targeted = self._bind_target(action, element_id)
+                holds = (
+                    (not self._requires_target(query, action) or element_id is not None)
+                    and self._verifier.verify_postconditions(
+                        targeted.postconditions, scene
+                    )
+                )
+            except Exception as error:
+                failure = self._exception_failure_code(
+                    error, FailureCode.VERIFICATION_FAILED
+                )
+                self._record(
+                    TraceEventType.VERIFICATION,
+                    scene.version,
+                    failure_code=failure.value,
+                )
+                return StepResult(
+                    success=False,
+                    scene=scene,
+                    failure_code=failure.value,
+                    skipped=True,
+                    grounding=last_grounding,
+                    pre_scene_version=initial_scene.version,
+                    post_scene_version=scene.version,
+                )
             stable = stable + 1 if holds else 0
             if stable >= self._wait_stable_polls:
                 self._record(TraceEventType.VERIFICATION, scene.version)
