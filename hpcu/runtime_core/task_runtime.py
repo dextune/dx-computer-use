@@ -54,7 +54,7 @@ def _scene_text_blob(scene: Scene) -> str:
         value
         for element in scene.elements.values()
         for value in (element.text, element.name)
-        if value
+        if element.state.visible and value
     )
 
 
@@ -294,17 +294,6 @@ class TaskRuntime:
                     evidence=evidence,
                     plan=current_plan,
                 )
-            if last.recovery_action is RecoveryAction.HALT:
-                return self._commit_terminal(
-                    status=TaskStatus.FAILED,
-                    node_id=node_id,
-                    steps=step_number,
-                    last_step=last,
-                    failure_code=FailureCode.LOOP_DETECTED.value,
-                    completed=completed,
-                    evidence=evidence,
-                    plan=current_plan,
-                )
             if self._irreversible_effect_is_uncertain(node, last):
                 return self._commit_terminal(
                     status=TaskStatus.HUMAN_HANDOFF,
@@ -312,6 +301,17 @@ class TaskRuntime:
                     steps=step_number,
                     last_step=last,
                     failure_code=failure.value,
+                    completed=completed,
+                    evidence=evidence,
+                    plan=current_plan,
+                )
+            if last.recovery_action is RecoveryAction.HALT:
+                return self._commit_terminal(
+                    status=TaskStatus.FAILED,
+                    node_id=node_id,
+                    steps=step_number,
+                    last_step=last,
+                    failure_code=FailureCode.LOOP_DETECTED.value,
                     completed=completed,
                     evidence=evidence,
                     plan=current_plan,
