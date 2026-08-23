@@ -48,6 +48,16 @@ def _blocked_token_matches(blob: str, token: str) -> bool:
     return re.search(pattern, haystack, re.IGNORECASE) is not None
 
 
+def _scene_text_blob(scene: Scene) -> str:
+    """Combine visible text and accessible names for safety-token scanning."""
+    return " ".join(
+        value
+        for element in scene.elements.values()
+        for value in (element.text, element.name)
+        if value
+    )
+
+
 class TaskStatus(str, Enum):
     RUNNING = "running"
     VERIFIED_SUCCESS = "verified_success"
@@ -211,10 +221,7 @@ class TaskRuntime:
                             plan=current_plan,
                         )
                     scene = self.control_loop.scene
-                blob = " ".join(
-                    (element.text or element.name or "")
-                    for element in scene.elements.values()
-                )
+                blob = _scene_text_blob(scene)
                 if any(
                     _blocked_token_matches(blob, token)
                     for token in current_plan.blocked_tokens
