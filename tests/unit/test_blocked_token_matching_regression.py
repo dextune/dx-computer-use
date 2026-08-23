@@ -2,7 +2,9 @@
 
 import pytest
 
-from hpcu.runtime_core.task_runtime import _blocked_token_matches
+from hpcu.runtime_core.task_runtime import _blocked_token_matches, _scene_text_blob
+from hpcu.schemas.scene import Scene
+from hpcu.schemas.ui_element import UIElement
 
 pytestmark = pytest.mark.unit
 
@@ -23,3 +25,23 @@ def test_korean_blocked_token_matches_attached_particle():
 
 def test_korean_blocked_token_does_not_match_inside_larger_leading_word():
     assert _blocked_token_matches("소셜로그인 옵션", "로그인") is False
+
+
+def test_scene_blob_keeps_text_and_accessible_name():
+    scene = Scene(
+        version=1,
+        elements={
+            "gate": UIElement(
+                id="gate",
+                scene_version=1,
+                text="Continue",
+                name="Login required",
+            )
+        },
+    )
+
+    blob = _scene_text_blob(scene)
+
+    assert "Continue" in blob
+    assert "Login required" in blob
+    assert _blocked_token_matches(blob, "login") is True
