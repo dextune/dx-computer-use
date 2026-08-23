@@ -18,17 +18,12 @@ pytestmark = pytest.mark.unit
 
 
 class _ControlLoop:
+    def __init__(self, result: StepResult) -> None:
+        self._result = result
+
     async def step(self, query, action, *, verification_query=None):
         del query, action, verification_query
-        return StepResult(
-            success=False,
-            scene=Scene(version=1),
-            failure_code=FailureCode.POSTCONDITION_UNMET.value,
-            execution=ExecutionResult(success=True, mode="semantic"),
-            recovery_action=RecoveryAction.HALT,
-            pre_scene_version=1,
-            post_scene_version=1,
-        )
+        return self._result
 
 
 def _plan() -> PlanIR:
@@ -53,9 +48,37 @@ def _plan() -> PlanIR:
     )
 
 
+def _failed_step(*, execution_success: bool, attempted: bool) -> StepResult:
+    return StepResult(
+        success=False,
+        scene=Scene(version=1),
+        failure_code=FailureCode.POSTCONDITION_UNMET.value,
+        execution=ExecutionResult(success=execution_success, mode="semantic"),
+        recovery_action=RecoveryAction.HALT,
+        pre_scene_version=1,
+        post_scene_version=1,
+        action_attempted=attempted,
+    )
+
+
 @pytest.mark.asyncio
-async def test_irreversible_success_with_uncertain_verification_beats_loop_halt():
-    result = await TaskRuntime(_ControlLoop()).run(_plan())
+@pytest.mark.parametrize("execution_success", (True, False))
+async def test_any_irreversible_execution_attempt_beats_loop_halt(execution_success):
+    result = await TaskRuntime(
+        _ControlLoop(
+            _failed_step(execution_success=execution_success, attempted=True)
+        )
+    ).run(_plan())
 
     assert result.status is TaskStatus.HUMAN_HANDOFF
     assert result.failure_code == FailureCode.POSTCONDITION_UNMET.value
+
+
+@pytest.mark.asyncio
+async def test_irreversible_failure_before_execution_can_fail_normally():
+    result = await TaskRuntime(
+        _ControlLoop(_failed_step(execution_success=False, attempted=False))
+    ).run(_plan())
+
+    assert result.status is TaskStatus.FAILED
+    assert result.failure_code == FailureCode.LOOP_DETECTED.value
