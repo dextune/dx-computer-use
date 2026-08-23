@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from hpcu.capture.backend import CaptureBackend, CaptureCapabilities
-from hpcu.observation.facade import CompositeObserver
+from hpcu.observation.facade import CompositeObserver, ObservationTransactionTimeout
 from hpcu.observation.structure_observer import (
     StructureCapabilities,
     StructureObserver,
@@ -146,7 +146,46 @@ async def test_observation_timeout_cancels_transaction():
         config={"performance": {"observe_timeout_ms": 1}},
     )
 
-    with pytest.raises(TimeoutError, match="transaction"):
+    with pytest.raises(ObservationTransactionTimeout, match="transaction"):
         await observer.observe()
 
     assert capture.cancelled.is_set()
+    metrics = observer.performance_snapshot.as_dict()
+    assert metrics["capture_structure_transaction"]["timeout_count"] == 1
+    assert metrics["capture_structure_transaction"]["error_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_backend_timeout_is_not_reclassified_as_observer_deadline():
+    class _TimeoutCapture(_Capture):
+        async def grab(self) -> FrameHandle:
+            raise TimeoutError("capture backend timed out")
+
+    observer = CompositeObserver(
+        "session",
+        _TimeoutCapture(),
+        _Structure(),
+        config={"performance": {"observe_timeout_ms": 100}},
+    )
+
+    with pytest.raises(TimeoutError, match="capture backend timed out") as exc_info:
+        await observer.observe()
+
+    assert not isinstance(exc_info.value, ObservationTransactionTimeout)
+    metrics = observer.performance_snapshot.as_dict()
+    assert metrics["capture"]["timeout_count"] == 1
+    assert metrics["capture_structure_transaction"]["timeout_count"] == 0
+    assert metrics["capture_structure_transaction"]["error_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_non_positive_observation_timeout_is_rejected():
+    observer = CompositeObserver(
+        "session",
+        _Capture(),
+        _Structure(),
+        config={"performance": {"observe_timeout_ms": 0}},
+    )
+
+    with pytest.raises(ValueError, match="positive"):
+        await observer.observe()
