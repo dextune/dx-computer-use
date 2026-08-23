@@ -47,6 +47,7 @@ jobs:
       - name: Lint runtime and local-resource surface
         run: >-
           python -m ruff check
+          hpcu/capture/frame_store.py
           hpcu/compiler/targeting_compiler.py
           hpcu/gateway
           hpcu/observation/facade.py
@@ -61,11 +62,13 @@ jobs:
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_budget_policy.py
+          tests/unit/test_frame_store.py
           tests/unit/test_observer_concurrency.py
           tests/unit/test_perception_runtime.py
           tests/unit/test_performance_trace.py
           tests/unit/test_product_runtime_resource_policy.py
           tests/unit/test_resource_policy.py
+          tests/unit/test_runtime_architecture.py
 
   focused-contracts:
     name: 2-focused-contracts
@@ -85,6 +88,7 @@ jobs:
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_budget_policy.py
+          tests/unit/test_frame_store.py
           tests/unit/test_observer_concurrency.py
           tests/unit/test_observer_facade.py
           tests/unit/test_perception.py
@@ -168,6 +172,7 @@ jobs:
             echo "deterministic round ${round}"
             python -m pytest -q \
               tests/unit/test_budget_policy.py \
+              tests/unit/test_frame_store.py \
               tests/unit/test_observer_concurrency.py \
               tests/unit/test_perception_runtime.py \
               tests/unit/test_performance_trace.py \
