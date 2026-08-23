@@ -38,12 +38,18 @@ class TaskBudgetLedger:
     def remaining_tokens(self) -> int:
         return max(0, self.spec.max_model_tokens - self.tokens_used)
 
-    def before_call(self, purpose: ModelCallPurpose) -> None:
+    def before_call(
+        self,
+        purpose: ModelCallPurpose,
+        *,
+        pending_latency_ms: int = 0,
+    ) -> None:
         if self.model_calls >= self.spec.max_model_calls:
             raise ModelBudgetExceeded("task model-call budget exhausted")
         if self.tokens_used >= self.spec.max_model_tokens:
             raise ModelBudgetExceeded("task model-token budget exhausted")
-        if self.latency_ms >= self.spec.max_model_latency_ms:
+        projected_latency = self.latency_ms + max(0, int(pending_latency_ms))
+        if projected_latency >= self.spec.max_model_latency_ms:
             raise ModelBudgetExceeded("task model-latency budget exhausted")
         self.calls_by_purpose[purpose] = self.calls_by_purpose.get(purpose, 0) + 1
 
@@ -123,9 +129,16 @@ class BudgetedGateway(Gateway):
             raise ModelBudgetExceeded("task model-token budget exhausted")
 
         started = self._monotonic()
+
+        def before_retry_attempt(attempt_purpose: ModelCallPurpose) -> None:
+            self.ledger.before_call(
+                attempt_purpose,
+                pending_latency_ms=self._elapsed_ms(started),
+            )
+
         try:
             if retryable:
-                with bind_retry_attempt_hook(self.ledger.before_call):
+                with bind_retry_attempt_hook(before_retry_attempt):
                     response = self._inner.call(
                         prompt,
                         system_prompt,
