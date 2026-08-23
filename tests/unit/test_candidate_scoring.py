@@ -88,8 +88,7 @@ def test_score_candidates_empty_query_is_fail_closed():
 
     scored = score_candidates([candidate], TargetQuery())
 
-    assert scored[0].score == 0.0
-    assert scored[0].confidence == 0.0
+    assert scored == []
 
 
 @pytest.mark.unit
@@ -98,7 +97,7 @@ def test_score_candidates_whitespace_role_is_not_targeting_information():
 
     scored = score_candidates([candidate], TargetQuery(text="   ", role="   "))
 
-    assert scored[0].confidence == 0.0
+    assert scored == []
 
 
 @pytest.mark.unit
