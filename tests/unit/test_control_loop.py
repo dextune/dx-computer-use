@@ -270,8 +270,8 @@ async def test_verification_grounding_preserves_cpu_failure_reason():
 
 
 @pytest.mark.unit
-async def test_navigate_falls_back_to_top_ambiguous_candidate():
-    """NAVIGATE with GROUNDING_AMBIGUOUS selects the top candidate instead of skipping."""
+async def test_navigate_ambiguous_target_fails_closed():
+    """NAVIGATE must not choose an arbitrary candidate after ambiguity."""
     ambiguous = _grounding(
         None,
         0.7,
@@ -297,11 +297,11 @@ async def test_navigate_falls_back_to_top_ambiguous_candidate():
     )
     result = await loop.step({"text": "로그인"}, action)
 
-    assert result.success is True
-    assert result.skipped is False
-    assert result.grounding is not None
-    assert result.grounding.element_id == "login"
-    assert injector.semantic_calls == ["login"]
+    assert result.success is False
+    assert result.skipped is True
+    assert result.failure_code == FailureCode.GROUNDING_AMBIGUOUS.value
+    assert result.grounding is ambiguous
+    assert injector.semantic_calls == []
     assert recorder.model_call_count == 0
 
 
