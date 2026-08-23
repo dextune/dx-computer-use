@@ -107,7 +107,7 @@ def test_retry_cannot_exceed_task_model_call_budget():
     gateway = BudgetedGateway(
         retrying,
         ledger,
-        monotonic=_Clock(10.0, 10.5),
+        monotonic=_Clock(10.0, 10.0, 10.4, 10.5),
     )
 
     # When / Then
@@ -132,7 +132,7 @@ def test_retry_attempts_are_counted_through_logical_wrapper():
     gateway = BudgetedGateway(
         _TransparentGateway(retrying),
         ledger,
-        monotonic=_Clock(20.0, 20.5),
+        monotonic=_Clock(20.0, 20.0, 20.2, 20.5),
     )
 
     # When
@@ -145,6 +145,30 @@ def test_retry_attempts_are_counted_through_logical_wrapper():
     assert ledger.calls_by_purpose[ModelCallPurpose.PLAN_COMPILE] == 2
     assert ledger.tokens_used == 7
     assert ledger.latency_ms == 500
+
+
+def test_retry_stops_when_observed_latency_budget_is_exhausted():
+    # Given
+    inner = _FlakyGateway(failures=1)
+    retrying = RetryableGateway(
+        inner,
+        max_retries=2,
+        base_delay_ms=0,
+        max_delay_ms=0,
+    )
+    ledger = _ledger(calls=3, latency_ms=100)
+    gateway = BudgetedGateway(
+        retrying,
+        ledger,
+        monotonic=_Clock(60.0, 60.0, 60.2, 60.25),
+    )
+
+    # When / Then
+    with pytest.raises(ModelBudgetExceeded, match="latency"):
+        gateway.call("ground", purpose=ModelCallPurpose.GROUNDING)
+    assert inner.attempts == 1
+    assert ledger.model_calls == 1
+    assert ledger.latency_ms == 250
 
 
 def test_failed_provider_call_accounts_local_elapsed_time():
@@ -195,7 +219,7 @@ def test_retry_attempt_hook_does_not_leak_after_budgeted_call():
     gateway = BudgetedGateway(
         retrying,
         ledger,
-        monotonic=_Clock(50.0, 50.5),
+        monotonic=_Clock(50.0, 50.0, 50.5),
     )
 
     # When
