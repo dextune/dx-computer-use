@@ -81,6 +81,7 @@ class CompositeObserver(Observer):
         self._version = 0
         self._capture_started = False
         self._previous: dict[str, UIElement] = {}
+        self._observe_lock = asyncio.Lock()
         self.performance_snapshot = PerformanceSnapshot()
 
     @property
@@ -92,6 +93,11 @@ class CompositeObserver(Observer):
         return self._structure_observer
 
     async def observe(self) -> SceneDelta:
+        """Run one stateful observation transaction at a time."""
+        async with self._observe_lock:
+            return await self._observe_serialized()
+
+    async def _observe_serialized(self) -> SceneDelta:
         timeout_ms = None
         if self._config is not None:
             performance = self._config.get("performance", {})
@@ -99,9 +105,8 @@ class CompositeObserver(Observer):
                 performance = {}
             timeout_ms = performance.get("observe_timeout_ms")
 
-        if timeout_ms is not None:
-            if not isinstance(timeout_ms, (int, float)):
-                timeout_ms = None
+        if timeout_ms is not None and not isinstance(timeout_ms, (int, float)):
+            timeout_ms = None
 
         t0 = asyncio.get_running_loop().time() * 1000
         try:
@@ -112,7 +117,8 @@ class CompositeObserver(Observer):
                         timeout=timeout_ms / 1000.0,
                     )
                 except asyncio.TimeoutError:
-                    self.performance_snapshot.capture_structure_transaction.timeout_count += 1
+                    metric = self.performance_snapshot.capture_structure_transaction
+                    metric.timeout_count += 1
                     raise asyncio.TimeoutError("observation transaction timed out") from None
             else:
                 result = await self._observe_transaction()
@@ -123,22 +129,24 @@ class CompositeObserver(Observer):
             raise
         else:
             elapsed = int(asyncio.get_running_loop().time() * 1000 - t0)
-            self.performance_snapshot.capture_structure_transaction.total_latency_ms += elapsed
+            metric = self.performance_snapshot.capture_structure_transaction
+            metric.total_latency_ms += elapsed
         return result
 
     async def _observe_transaction(self) -> SceneDelta:
         """Grab frame and read structure in parallel, then build delta."""
         frame_task = asyncio.create_task(self._grab_frame())
         structure_task = asyncio.create_task(self._read_structure())
+        tasks = (frame_task, structure_task)
         try:
-            frame, current = await asyncio.gather(frame_task, structure_task)
+            frame, current = await asyncio.gather(*tasks)
         except BaseException:
-            frame_task.cancel()
-            structure_task.cancel()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
             raise
 
-        self.performance_snapshot.capture.count += 1
-        self.performance_snapshot.structure.count += 1
         self.performance_snapshot.capture_structure_transaction.count += 1
 
         if self._perception is not None and frame is not None:
@@ -167,18 +175,44 @@ class CompositeObserver(Observer):
         )
 
     async def _grab_frame(self) -> Optional[FrameHandle]:
-        if self._capture_backend is None:
-            return None
-        if not self._capture_started:
-            await self._capture_backend.start()
-            self._capture_started = True
-        return await self._capture_backend.grab()
+        metric = self.performance_snapshot.capture
+        t0 = asyncio.get_running_loop().time() * 1000
+        try:
+            if self._capture_backend is None:
+                result = None
+            else:
+                if not self._capture_started:
+                    await self._capture_backend.start()
+                    self._capture_started = True
+                result = await self._capture_backend.grab()
+        except Exception:
+            metric.error_count += 1
+            raise
+        else:
+            metric.count += 1
+            metric.total_latency_ms += int(
+                asyncio.get_running_loop().time() * 1000 - t0
+            )
+            return result
 
     async def _read_structure(self) -> dict[str, UIElement]:
-        if self._structure_observer is None:
-            return {}
-        snapshot = await self._structure_observer.observe_structure()
-        return {element.id: element for element in snapshot}
+        metric = self.performance_snapshot.structure
+        t0 = asyncio.get_running_loop().time() * 1000
+        try:
+            if self._structure_observer is None:
+                result: dict[str, UIElement] = {}
+            else:
+                snapshot = await self._structure_observer.observe_structure()
+                result = {element.id: element for element in snapshot}
+        except Exception:
+            metric.error_count += 1
+            raise
+        else:
+            metric.count += 1
+            metric.total_latency_ms += int(
+                asyncio.get_running_loop().time() * 1000 - t0
+            )
+            return result
 
     def _remap_ids(self, current: dict[str, UIElement]) -> dict[str, UIElement]:
         if not self._previous:
