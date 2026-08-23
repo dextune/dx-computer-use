@@ -1,19 +1,14 @@
-"""Goal to TargetingPack compiler with one typed semantic boundary.
-
-T1 is a model-free goal tokenizer. T2 performs one logical plan call and uses
-the shared gateway framing API. Provider transport retries remain below this
-compiler. Lexical fallback is used only when no semantic gateway is configured;
-a configured gateway failure or invalid response fails closed.
-"""
+"""Goal to TargetingPack compiler with one typed semantic boundary."""
 
 from __future__ import annotations
 
 import re
 from typing import Optional
 
-from hpcu.gateway.gateway import Gateway, ModelCallPurpose
+from hpcu.gateway.async_gateway import call_gateway_async
+from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
 from hpcu.gateway.json_response import select_json_object
-from hpcu.runtime_config import load_runtime_config
+from hpcu.runtime_config import load_runtime_config, semantic_call_timeout_ms
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.targeting import TargetingPack
 
@@ -35,7 +30,6 @@ _TARGETING_KEYS = frozenset(
 
 
 def _tokenize_goal(goal: str, min_length: int) -> list[str]:
-    """Split a goal string into tokens, filtering short ones."""
     raw = _PUNCTUATION_SPLIT.split(goal)
     seen: set[str] = set()
     tokens: list[str] = []
@@ -85,7 +79,7 @@ class GoalFallbackTokenizer:
 
 
 class TargetingCompiler:
-    """Compile a user goal with one logical model call and fail closed."""
+    """Compile a user goal once and fail closed for configured providers."""
 
     def __init__(
         self,
@@ -97,7 +91,8 @@ class TargetingCompiler:
         runtime = config if config is not None else load_runtime_config()
         limits = runtime.get("semantic", {}).get("request_limits", {})
         self._max_tokens = int(limits.get("plan_compile_max_tokens", 1024))
-        self._fallback = GoalFallbackTokenizer(config=config)
+        self._timeout_ms = semantic_call_timeout_ms(runtime)
+        self._fallback = GoalFallbackTokenizer(config=runtime)
         self.last_diagnostic = ""
 
     def compile(self, goal_id: str, goal: str, start_url: str = "") -> TargetingPack:
@@ -105,23 +100,52 @@ class TargetingCompiler:
         if self._gateway is None:
             self.last_diagnostic = "gateway_unavailable"
             return self._fallback.tokenize(goal_id, goal)
-
         try:
             response = self._gateway.call(
                 prompt=_build_compile_prompt(goal, start_url),
-                system_prompt=(
-                    "Return exactly one compact JSON object. No markdown, "
-                    "commentary, reasoning, or null values."
-                ),
+                system_prompt=_compile_system_prompt(),
                 max_tokens=self._max_tokens,
                 purpose=ModelCallPurpose.PLAN_COMPILE,
             )
         except Exception as error:
-            diagnostic = f"gateway_error:{type(error).__name__}"
-            self.last_diagnostic = diagnostic
-            failure_code = self._gateway_failure_code(error)
-            raise TargetingCompilationError(diagnostic, failure_code) from error
+            self._raise_gateway_error(error)
+        return self._pack_response(goal_id, response)
 
+    async def compile_async(
+        self,
+        goal_id: str,
+        goal: str,
+        start_url: str = "",
+    ) -> TargetingPack:
+        """Compile without blocking the task runtime event loop."""
+        self.last_diagnostic = ""
+        if self._gateway is None:
+            self.last_diagnostic = "gateway_unavailable"
+            return self._fallback.tokenize(goal_id, goal)
+        try:
+            response = await call_gateway_async(
+                self._gateway,
+                _build_compile_prompt(goal, start_url),
+                system_prompt=_compile_system_prompt(),
+                max_tokens=self._max_tokens,
+                purpose=ModelCallPurpose.PLAN_COMPILE,
+                timeout_ms=self._timeout_ms,
+            )
+        except Exception as error:
+            self._raise_gateway_error(error)
+        return self._pack_response(goal_id, response)
+
+    def _raise_gateway_error(self, error: Exception) -> None:
+        diagnostic = f"gateway_error:{type(error).__name__}"
+        self.last_diagnostic = diagnostic
+        failure_code = self._gateway_failure_code(error)
+        raise TargetingCompilationError(diagnostic, failure_code) from error
+
+    def _pack_response(
+        self,
+        goal_id: str,
+        response: GatewayResponse,
+    ) -> TargetingPack:
         try:
             payload = select_json_object(
                 response.content,
@@ -154,6 +178,13 @@ class TargetingCompiler:
             return FailureCode(raw)
         except (TypeError, ValueError):
             return FailureCode.MODEL_FAILED
+
+
+def _compile_system_prompt() -> str:
+    return (
+        "Return exactly one compact JSON object. No markdown, commentary, "
+        "reasoning, or null values."
+    )
 
 
 def _build_compile_prompt(goal: str, start_url: str) -> str:
