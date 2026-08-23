@@ -59,7 +59,9 @@ def _command_result(*, status: TaskStatus = TaskStatus.VERIFIED_SUCCESS):
         failure_code=failure,
         final_scene_version=7,
         final_frame_id="frame-7",
-        terminal_evidence_ids=("result",),
+        terminal_evidence_ids=(
+            ("result",) if status is TaskStatus.VERIFIED_SUCCESS else ()
+        ),
         completed_node_ids=("navigate", "verify"),
         plan_hash="plan-hash",
     )

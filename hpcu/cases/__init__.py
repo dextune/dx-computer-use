@@ -1,4 +1,4 @@
-from hpcu.cases.runner import CaseRunner, evidence_holds
+from hpcu.cases.runner import CaseRunner
 from hpcu.cases.specs import CaseSpec, EvidenceSpec, load_cases
 from hpcu.cases.stats import (
     DEFAULT_MODEL_ID,
@@ -23,6 +23,5 @@ __all__ = [
     "DEFAULT_PROVIDER_ID",
     "aggregate",
     "dumps_stats",
-    "evidence_holds",
     "load_cases",
 ]
