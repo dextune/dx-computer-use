@@ -7,8 +7,8 @@ Scoring factors (weighted sum, all normalised to [0, 1]):
 - source_reliability: trust (DOM > UIA/AT-SPI/AX > OCR) times source confidence
 - structure_match: visibility/enabled/occlusion + presence of a bounding box
 
-The resulting `score` and `confidence` are both the same weighted value in
-[0, 1] — high-confidence candidates can be executed without calling the model.
+Only visible, non-occluded elements enter the executable candidate set. The
+resulting `score` and `confidence` are both the same weighted value in [0, 1].
 """
 
 from dataclasses import dataclass
@@ -167,10 +167,10 @@ def score_candidates(
     *,
     min_score: float = 0.0,
 ) -> list[ScoredCandidate]:
-    """Score scene elements against a target query, sorted best-first.
+    """Score visible scene elements against a target query, sorted best-first.
 
-    Elements scoring below `min_score` are filtered out.  The list is sorted
-    by descending score (and confidence, then stable insertion order).
+    Hidden or occluded elements are excluded before scoring. Elements scoring
+    below `min_score` are filtered out. The list is sorted by descending score.
     """
     if not isinstance(target_query, TargetQuery):
         target_query = TargetQuery(text=str(target_query or ""))
@@ -180,6 +180,8 @@ def score_candidates(
 
     scored: list[ScoredCandidate] = []
     for element in candidates:
+        if not element.state.visible or element.state.occluded:
+            continue
         candidate = _score_element(element, target_query)
         if candidate.score >= min_score:
             scored.append(candidate)
