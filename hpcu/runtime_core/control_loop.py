@@ -443,13 +443,11 @@ class ControlLoop:
 
     @staticmethod
     def _requires_target(query: dict | None, action: Action) -> bool:
-        if action.op in _LOCAL_VERIFY_OPS:
-            return False
-        if action.op is ActionOp.FOCUS_WINDOW:
-            return False
-        if query:
-            return True
-        return action.target.element_id is not None
+        # A supplied query is an explicit request to ground an abstract target;
+        # no operation may silently ignore its failure. Operations such as
+        # FOCUS_WINDOW may still run targetless when no query/element binding
+        # was requested at all.
+        return bool(query) or action.target.element_id is not None
 
     @staticmethod
     def _bind_target(action: Action, element_id: str | None) -> Action:
