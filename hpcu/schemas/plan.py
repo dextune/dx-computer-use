@@ -124,24 +124,69 @@ class PlanNode:
 
 
 def _node_payload(node: PlanNode) -> dict[str, object]:
+    action = node.action
     return {
         "id": node.id,
-        "op": node.action.op.value,
-        "value": node.action.value,
-        "key": node.action.key,
+        "action": {
+            "id": action.id,
+            "op": action.op.value,
+            "target": {
+                "element_id": action.target.element_id,
+                "locator": action.target.locator,
+            },
+            "pre": [
+                (condition.kind.value, condition.target, condition.value)
+                for condition in action.preconditions
+            ],
+            "post": [
+                (
+                    condition.kind.value,
+                    condition.target,
+                    condition.value_ref,
+                    condition.value,
+                )
+                for condition in action.postconditions
+            ],
+            "timeout_ms": action.timeout_ms,
+            "retry": {
+                "max_attempts": action.retry.max_attempts,
+                "alternate_modes": list(action.retry.alternate_modes),
+            },
+            "value": action.value,
+            "value_ref": action.value_ref,
+            "key": action.key,
+            "modifiers": list(action.modifiers),
+            "dx": action.dx,
+            "dy": action.dy,
+        },
         "query": node.target_query.as_dict() if node.target_query else None,
         "verification_query": (
             node.verification_query.as_dict() if node.verification_query else None
         ),
+        "grounding_hints": (
+            {
+                "tokens": list(node.grounding_hints.tokens),
+                "ignore_tokens": list(node.grounding_hints.ignore_tokens),
+                "source": node.grounding_hints.source,
+            }
+            if node.grounding_hints is not None
+            else None
+        ),
         "surface": node.surface.value,
         "success": node.success_edge,
         "failure": sorted(node.failure_edges.items()),
-        "post": [
-            (condition.kind.value, condition.target, condition.value)
-            for condition in node.action.postconditions
-        ],
         "evidence": list(node.evidence_requirements),
         "irreversible": node.irreversible,
+    }
+
+
+def _budget_payload(budget: TaskBudgetSpec) -> dict[str, int | None]:
+    return {
+        "max_model_calls": budget.max_model_calls,
+        "max_model_tokens": budget.max_model_tokens,
+        "max_model_latency_ms": budget.max_model_latency_ms,
+        "planning_call_ceiling": budget.planning_call_ceiling,
+        "recovery_call_reserve": budget.recovery_call_reserve,
     }
 
 
@@ -205,6 +250,7 @@ class PlanIR:
             "strategy": self.strategy_id,
             "entry": self.entry_node_id,
             "nodes": [_node_payload(self.nodes[key]) for key in sorted(self.nodes)],
+            "budget": _budget_payload(self.task_budget),
             "compiler": self.compiler_version,
             "lineage": list(self.patch_lineage),
             "blocked": list(self.blocked_tokens),
