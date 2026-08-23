@@ -28,6 +28,26 @@ from hpcu.schemas.trace import TraceEventType
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
+def _blocked_token_matches(blob: str, token: str) -> bool:
+    """Match access-control vocabulary without English substring false positives.
+
+    ASCII tokens use word boundaries on both sides. Non-ASCII tokens keep the
+    leading boundary but allow a trailing inflection/particle, which is needed
+    for languages such as Korean (for example ``로그인`` in ``로그인이 필요합니다``).
+    """
+    haystack = _WHITESPACE_RE.sub(" ", blob).strip()
+    needle = _WHITESPACE_RE.sub(" ", token).strip()
+    if not haystack or not needle:
+        return False
+
+    prefix = r"(?<!\w)" if (needle[0].isalnum() or needle[0] == "_") else ""
+    suffix = ""
+    if needle.isascii() and (needle[-1].isalnum() or needle[-1] == "_"):
+        suffix = r"(?!\w)"
+    pattern = prefix + re.escape(needle) + suffix
+    return re.search(pattern, haystack, re.IGNORECASE) is not None
+
+
 class TaskStatus(str, Enum):
     RUNNING = "running"
     VERIFIED_SUCCESS = "verified_success"
@@ -196,7 +216,7 @@ class TaskRuntime:
                     for element in scene.elements.values()
                 )
                 if any(
-                    re.search(r"\b" + re.escape(token) + r"\b", blob, re.IGNORECASE)
+                    _blocked_token_matches(blob, token)
                     for token in current_plan.blocked_tokens
                 ):
                     return self._commit_terminal(
