@@ -4,10 +4,10 @@ from dataclasses import replace
 
 import pytest
 
-from hpcu.schemas.action import Action, ActionOp
+from hpcu.schemas.action import Action, ActionOp, ActionTarget, RetryPolicy
 from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.goal import GoalEnvelope, IntentKind
-from hpcu.schemas.plan import PlanIR, PlanNode, PlanningContext
+from hpcu.schemas.plan import GroundingHints, PlanIR, PlanNode, PlanningContext
 from hpcu.schemas.surface import SurfaceKind
 
 pytestmark = pytest.mark.unit
@@ -35,6 +35,10 @@ def _plan(blocked_tokens=()) -> PlanIR:
     )
 
 
+def _replace_node(plan: PlanIR, node: PlanNode) -> PlanIR:
+    return replace(plan, nodes={node.id: node})
+
+
 def test_blocked_tokens_change_plan_hash():
     first = _plan(("captcha",))
     second = replace(first, blocked_tokens=("login",))
@@ -59,3 +63,59 @@ def test_blocked_tokens_reject_non_strings():
 
     with pytest.raises(ValueError, match="non-empty strings"):
         _plan((123,))
+
+
+def test_action_timeout_and_retry_change_plan_hash():
+    first = _plan()
+    node = first.nodes["checkpoint"]
+    changed_action = replace(
+        node.action,
+        timeout_ms=node.action.timeout_ms + 1,
+        retry=RetryPolicy(max_attempts=7, alternate_modes=("semantic",)),
+    )
+    second = _replace_node(first, replace(node, action=changed_action))
+
+    assert first.plan_hash != second.plan_hash
+
+
+def test_action_target_changes_plan_hash():
+    first = _plan()
+    node = first.nodes["checkpoint"]
+    changed_action = replace(
+        node.action,
+        target=ActionTarget(element_id="different", locator="css=#different"),
+    )
+    second = _replace_node(first, replace(node, action=changed_action))
+
+    assert first.plan_hash != second.plan_hash
+
+
+def test_grounding_hints_change_plan_hash():
+    first = _plan()
+    node = first.nodes["checkpoint"]
+    second = _replace_node(
+        first,
+        replace(
+            node,
+            grounding_hints=GroundingHints(
+                tokens=("ready",),
+                ignore_tokens=("ad",),
+                source="plan_context",
+            ),
+        ),
+    )
+
+    assert first.plan_hash != second.plan_hash
+
+
+def test_task_budget_changes_plan_hash():
+    first = _plan()
+    second = replace(
+        first,
+        task_budget=replace(
+            first.task_budget,
+            max_model_tokens=first.task_budget.max_model_tokens + 1,
+        ),
+    )
+
+    assert first.plan_hash != second.plan_hash
