@@ -1,4 +1,4 @@
-"""Task-global model budget accounting and a gateway wrapper."""
+"""Task-global semantic budget accounting and gateway enforcement."""
 
 import time
 from collections.abc import Callable
@@ -10,9 +10,20 @@ from hpcu.gateway.gateway import (
     ModelCallPurpose,
     RetryableGateway,
     bind_retry_attempt_hook,
+    walk_gateway_chain,
 )
 from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.failure_codes import FailureCode
+
+_PLANNING_PURPOSES = frozenset(
+    {ModelCallPurpose.INTENT_FILL, ModelCallPurpose.PLAN_COMPILE}
+)
+_RECOVERY_PURPOSES = frozenset(
+    {
+        ModelCallPurpose.POST_ACTION_REANALYSIS,
+        ModelCallPurpose.RECOVERY_REANALYSIS,
+    }
+)
 
 
 class ModelBudgetExceeded(RuntimeError):
@@ -38,12 +49,17 @@ class TaskBudgetLedger:
     def remaining_tokens(self) -> int:
         return max(0, self.spec.max_model_tokens - self.tokens_used)
 
+    def calls_for(self, purposes: frozenset[ModelCallPurpose]) -> int:
+        return sum(self.calls_by_purpose.get(item, 0) for item in purposes)
+
     def before_call(
         self,
         purpose: ModelCallPurpose,
         *,
         pending_latency_ms: int = 0,
     ) -> None:
+        if not isinstance(purpose, ModelCallPurpose):
+            purpose = ModelCallPurpose(purpose)
         if self.model_calls >= self.spec.max_model_calls:
             raise ModelBudgetExceeded("task model-call budget exhausted")
         if self.tokens_used >= self.spec.max_model_tokens:
@@ -51,6 +67,18 @@ class TaskBudgetLedger:
         projected_latency = self.latency_ms + max(0, int(pending_latency_ms))
         if projected_latency >= self.spec.max_model_latency_ms:
             raise ModelBudgetExceeded("task model-latency budget exhausted")
+
+        reserve = self.spec.recovery_call_reserve
+        if purpose not in _RECOVERY_PURPOSES and self.remaining_calls <= reserve:
+            raise ModelBudgetExceeded("task recovery model-call reserve reached")
+
+        planning_limit = self.spec.planning_call_ceiling
+        if (
+            planning_limit is not None
+            and purpose in _PLANNING_PURPOSES
+            and self.calls_for(_PLANNING_PURPOSES) >= planning_limit
+        ):
+            raise ModelBudgetExceeded("task planning model-call ceiling reached")
         self.calls_by_purpose[purpose] = self.calls_by_purpose.get(purpose, 0) + 1
 
     def record(
@@ -80,18 +108,14 @@ class TaskBudgetLedger:
 
 
 def _contains_retryable_gateway(gateway: Gateway) -> bool:
-    current: object | None = gateway
-    seen: set[int] = set()
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, RetryableGateway):
-            return True
-        current = getattr(current, "_inner", None)
-    return False
+    return any(
+        isinstance(layer, RetryableGateway)
+        for layer in walk_gateway_chain(gateway)
+    )
 
 
 class BudgetedGateway(Gateway):
-    """One accounting boundary for plan/ground/reanalysis/recovery calls."""
+    """One accounting boundary for plan, grounding, and recovery calls."""
 
     def __init__(
         self,
@@ -111,6 +135,10 @@ class BudgetedGateway(Gateway):
     @property
     def model_id(self) -> str:
         return self._inner.model_id
+
+    @property
+    def inner_gateway(self) -> Gateway:
+        return self._inner
 
     def call(
         self,

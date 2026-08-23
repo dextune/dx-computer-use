@@ -9,7 +9,9 @@ semantic:
     intent_fill_max_tokens: 256
     action_decision_max_tokens: 512
     reanalysis_max_tokens: 512
+    intent_fill_retry_attempts: 1
     plan_compile_retry_attempts: 2
+    grounding_retry_attempts: 1
     action_decision_retry_attempts: 2
     reanalysis_retry_attempts: 2
     retry_base_delay_ms: 500
@@ -32,11 +34,20 @@ performance:
   settle_timeout_ms: 2000
   action_timeout_ms: 5000
   model_call_timeout_ms: 30000
+  observe_timeout_ms: 5000
   settle_poll_interval_ms: 5
   settle_stable_polls: 2
+  local_reserve_cores: 1
+  max_perception_workers: 4
+  perception_queue_multiplier: 2
+  max_perception_queue_depth: 0
 
 tier_budget:
-  max_model_calls_per_task: 8
+  max_model_calls_per_task: 3
+  max_model_tokens_per_task: 4096
+  max_model_latency_ms_per_task: 60000
+  planning_call_ceiling: 2
+  recovery_call_reserve: 1
   max_vlm_calls_per_task: 3
 
 recovery:
@@ -53,6 +64,8 @@ perception:
   ocr_sparse_psm: 11
   ocr_min_regions_for_dense: 8
   line_y_tolerance_px: 8
+  ocr_cache_entries: 32
+  dirty_roi_max_ratio: 0.35
 
 targeting:
   max_tokens_per_field: 8

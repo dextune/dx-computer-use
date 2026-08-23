@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+import inspect
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
-from hpcu.gateway.gateway import Gateway, RetryableGateway
+from hpcu.gateway.gateway import (
+    Gateway,
+    RetryableGateway,
+    walk_gateway_chain,
+)
 from hpcu.planning.goal_interpreter import GoalInterpreter
 from hpcu.planning.plan_compiler import PlanCompiler
 from hpcu.planning.semantic_interrupt import SemanticSlotFiller
 from hpcu.planning.strategy_planner import StrategyPlanner
-from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
+from hpcu.runtime_config import (
+    configured_semantic_identity,
+    effective_task_budget,
+    load_runtime_config,
+    semantic_call_timeout_ms,
+    semantic_retry_attempts,
+)
 from hpcu.runtime_core.control_loop import ControlLoop
 from hpcu.runtime_core.task_budget import BudgetedGateway, TaskBudgetLedger
 from hpcu.runtime_core.task_runtime import Repairer, TaskRunResult, TaskRuntime
@@ -30,7 +41,7 @@ class CommandRequest:
     instruction: str
     capability: CapabilitySnapshot
     planning_context: PlanningContext | None = None
-    task_budget: TaskBudgetSpec = TaskBudgetSpec()
+    task_budget: TaskBudgetSpec | None = None
     max_steps: int | None = None
     context_metadata: Mapping[str, str] = field(default_factory=dict)
 
@@ -64,6 +75,7 @@ class CommandRunResult:
 
 
 RepairerFactory = Callable[[Gateway, TaskBudgetLedger], Repairer]
+PlanningContextResult = PlanningContext | Awaitable[PlanningContext]
 PlanningContextProvider = Callable[
     [
         GoalEnvelope,
@@ -72,7 +84,7 @@ PlanningContextProvider = Callable[
         Gateway | None,
         TaskBudgetLedger,
     ],
-    PlanningContext,
+    PlanningContextResult,
 ]
 
 
@@ -80,19 +92,14 @@ def _contains_gateway_type(
     gateway: Gateway,
     gateway_type: type[Gateway],
 ) -> bool:
-    """Inspect transparent wrapper layers without following cycles."""
-    current: object | None = gateway
-    seen: set[int] = set()
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, gateway_type):
-            return True
-        current = getattr(current, "_inner", None)
-    return False
+    return any(
+        isinstance(layer, gateway_type)
+        for layer in walk_gateway_chain(gateway)
+    )
 
 
 class CommandRuntime:
-    """Build one ledger, one semantic boundary, and one TaskRuntime per task."""
+    """Build one ledger, semantic boundary, and TaskRuntime per task."""
 
     def __init__(
         self,
@@ -126,16 +133,27 @@ class CommandRuntime:
         self._semantic_replanner_factory = semantic_replanner_factory
 
     async def run(self, request: CommandRequest) -> CommandRunResult:
-        ledger = TaskBudgetLedger(request.task_budget)
+        task_budget = effective_task_budget(self._config, request.task_budget)
+        ledger = TaskBudgetLedger(task_budget)
         gateway = self._semantic_gateway(ledger)
-        semantic_fill = SemanticSlotFiller(gateway) if gateway is not None else None
 
         goal = self._goal_interpreter.interpret(
             request.instruction,
-            semantic_fill=semantic_fill,
-            latency_budget_ms=request.task_budget.max_model_latency_ms,
-            model_call_budget=request.task_budget.max_model_calls,
+            semantic_fill=None,
+            latency_budget_ms=task_budget.max_model_latency_ms,
+            model_call_budget=task_budget.max_model_calls,
         )
+        if goal.ambiguity_slots and gateway is not None:
+            limits = self._config.get("semantic", {}).get(
+                "request_limits", {}
+            )
+            filler = SemanticSlotFiller(
+                gateway,
+                max_tokens=int(limits.get("intent_fill_max_tokens", 256)),
+                timeout_ms=semantic_call_timeout_ms(self._config),
+            )
+            values = await filler.fill(goal)
+            goal = self._apply_semantic_fill(goal, values)
         if goal.ambiguity_slots:
             raise UnresolvedGoalError(
                 "command has unresolved slots: "
@@ -145,9 +163,7 @@ class CommandRuntime:
         strategy = self._strategy_planner.select(goal, request.capability)
         context = request.planning_context
         if context is None:
-            if self._planning_context_provider is None:
-                raise ValueError("planning context or context provider is required")
-            context = self._planning_context_provider(
+            context = await self._provide_planning_context(
                 goal,
                 strategy,
                 request,
@@ -158,11 +174,12 @@ class CommandRuntime:
             goal,
             strategy,
             context,
-            request.task_budget,
+            task_budget,
         )
         semantic_replanner = (
             self._semantic_replanner_factory(gateway, ledger)
-            if gateway is not None and self._semantic_replanner_factory is not None
+            if gateway is not None
+            and self._semantic_replanner_factory is not None
             else None
         )
         control_loop = self._control_loop_factory()
@@ -196,6 +213,48 @@ class CommandRuntime:
             model_id=gateway.model_id if gateway is not None else "",
         )
 
+    def _apply_semantic_fill(
+        self,
+        goal: GoalEnvelope,
+        values: Mapping[str, str],
+    ) -> GoalEnvelope:
+        public = getattr(self._goal_interpreter, "apply_semantic_fill", None)
+        if callable(public):
+            return public(goal, values)
+        private = getattr(self._goal_interpreter, "_apply_semantic_fill", None)
+        if not callable(private):
+            raise TypeError(
+                "goal interpreter must expose semantic fill application"
+            )
+        return private(goal, values)
+
+    async def _provide_planning_context(
+        self,
+        goal: GoalEnvelope,
+        strategy: StrategyPlan,
+        request: CommandRequest,
+        gateway: Gateway | None,
+        ledger: TaskBudgetLedger,
+    ) -> PlanningContext:
+        provider = self._planning_context_provider
+        if provider is None:
+            raise ValueError("planning context or context provider is required")
+        async_provider = getattr(provider, "provide_async", None)
+        if callable(async_provider):
+            return await async_provider(
+                goal,
+                strategy,
+                request,
+                gateway,
+                ledger,
+            )
+        context = provider(goal, strategy, request, gateway, ledger)
+        if inspect.isawaitable(context):
+            context = await context
+        if not isinstance(context, PlanningContext):
+            raise TypeError("planning context provider returned an invalid value")
+        return context
+
     def _semantic_gateway(
         self,
         ledger: TaskBudgetLedger,
@@ -203,11 +262,21 @@ class CommandRuntime:
         if self._provider_gateway is None:
             return None
         limits = self._config.get("semantic", {}).get("request_limits", {})
+        retry_policy = semantic_retry_attempts(self._config)
         transport = self._provider_gateway
-        if not _contains_gateway_type(transport, RetryableGateway):
+        retry_layers = [
+            layer
+            for layer in walk_gateway_chain(transport)
+            if isinstance(layer, RetryableGateway)
+        ]
+        if retry_layers:
+            for layer in retry_layers:
+                layer.configure_retry_policy(retry_policy)
+        else:
             transport = RetryableGateway(
                 transport,
-                max_retries=int(limits.get("action_decision_retry_attempts", 2)),
+                max_retries=max(retry_policy.values(), default=0),
+                max_retries_by_purpose=retry_policy,
                 base_delay_ms=int(limits.get("retry_base_delay_ms", 500)),
                 max_delay_ms=int(limits.get("retry_max_delay_ms", 8000)),
             )

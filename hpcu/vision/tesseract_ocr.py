@@ -1,11 +1,9 @@
-"""Tesseract CLI OCR over PNG bytes — OS-agnostic, no platform imports."""
+"""Tesseract CLI OCR over PNG bytes through stdin."""
 
 from __future__ import annotations
 
 import shutil
 import subprocess
-import tempfile
-from pathlib import Path
 
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace
 from hpcu.vision.ocr import TextRegion
@@ -21,29 +19,25 @@ def detect_png(
     languages: str = "kor+eng",
     psm: int = 6,
 ) -> list[TextRegion]:
-    """Run tesseract TSV on a PNG and return word boxes.
-
-    Falls back to `eng` when `languages` is unavailable.
-    """
+    """Run Tesseract TSV without creating a temporary image file."""
     if not tesseract_available():
         return []
-    with tempfile.TemporaryDirectory() as tmp:
-        image_path = Path(tmp) / "frame.png"
-        image_path.write_bytes(png_bytes)
-        raw = _run_tesseract(image_path, languages, psm)
-        if raw is None and languages != "eng":
-            raw = _run_tesseract(image_path, "eng", psm)
-        if not raw:
-            return []
-        return _parse_tsv(raw)
+    raw = _run_tesseract(png_bytes, languages, psm)
+    used_language = languages
+    if raw is None and languages != "eng":
+        raw = _run_tesseract(png_bytes, "eng", psm)
+        used_language = "eng"
+    if not raw:
+        return []
+    return _parse_tsv(raw, used_language)
 
 
-def _run_tesseract(image_path: Path, languages: str, psm: int) -> str | None:
+def _run_tesseract(png_bytes: bytes, languages: str, psm: int) -> str | None:
     try:
         completed = subprocess.run(
             [
                 "tesseract",
-                str(image_path),
+                "stdin",
                 "stdout",
                 "-l",
                 languages,
@@ -51,19 +45,19 @@ def _run_tesseract(image_path: Path, languages: str, psm: int) -> str | None:
                 str(psm),
                 "tsv",
             ],
+            input=png_bytes,
             check=False,
             capture_output=True,
-            text=True,
             timeout=20,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
     if completed.returncode != 0:
         return None
-    return completed.stdout
+    return completed.stdout.decode("utf-8", errors="replace")
 
 
-def _parse_tsv(tsv: str) -> list[TextRegion]:
+def _parse_tsv(tsv: str, language: str = "") -> list[TextRegion]:
     regions: list[TextRegion] = []
     lines = tsv.splitlines()
     if not lines:
@@ -105,7 +99,7 @@ def _parse_tsv(tsv: str) -> list[TextRegion]:
                     height=float(cols[i_height]),
                 ),
                 confidence=max(0.0, min(1.0, conf / 100.0)),
-                language="kor",
+                language=language,
             )
         )
     return regions

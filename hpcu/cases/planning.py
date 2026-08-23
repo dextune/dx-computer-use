@@ -1,4 +1,4 @@
-"""Case data adapters that produce planning context and PlanIR entry nodes."""
+"""Case adapters that produce planning context and PlanIR entry nodes."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from hpcu.schemas.capability import Capability
 from hpcu.schemas.goal import GoalEnvelope, IntentKind
 from hpcu.schemas.plan import PlanIR, PlanningContext, PlanNode, TargetQuerySpec
 from hpcu.schemas.strategy import StrategyPlan
+from hpcu.schemas.targeting import TargetingPack
 
 _LOCAL_OPS = frozenset(
     {
@@ -126,11 +127,46 @@ class CasePlanningContextProvider:
         ledger: TaskBudgetLedger,
     ) -> PlanningContext:
         del ledger
-        case_id = request.context_metadata.get("case_id", "case")
-        start_url = request.context_metadata.get("start_url", "")
-        compiler = TargetingCompiler(gateway, config=self._config)
-        pack = compiler.compile(case_id, goal.raw_instruction, start_url)
+        case_id, start_url = self._request_values(request)
+        pack = TargetingCompiler(gateway, config=self._config).compile(
+            case_id,
+            goal.raw_instruction,
+            start_url,
+        )
+        return self._context(goal, strategy, request, pack, start_url)
 
+    async def provide_async(
+        self,
+        goal: GoalEnvelope,
+        strategy: StrategyPlan,
+        request: CommandRequest,
+        gateway: Gateway | None,
+        ledger: TaskBudgetLedger,
+    ) -> PlanningContext:
+        """Compile model-assisted context outside the event-loop thread."""
+        del ledger
+        case_id, start_url = self._request_values(request)
+        pack = await TargetingCompiler(
+            gateway,
+            config=self._config,
+        ).compile_async(case_id, goal.raw_instruction, start_url)
+        return self._context(goal, strategy, request, pack, start_url)
+
+    @staticmethod
+    def _request_values(request: CommandRequest) -> tuple[str, str]:
+        return (
+            request.context_metadata.get("case_id", "case"),
+            request.context_metadata.get("start_url", ""),
+        )
+
+    def _context(
+        self,
+        goal: GoalEnvelope,
+        strategy: StrategyPlan,
+        request: CommandRequest,
+        pack: TargetingPack,
+        start_url: str,
+    ) -> PlanningContext:
         success_text = self._joined(pack.success_any) or pack.pick_query
         ready_text = self._joined(pack.ready_any) or success_text
         pick_text = pack.pick_query or goal.raw_instruction

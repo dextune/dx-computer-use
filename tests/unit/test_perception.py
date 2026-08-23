@@ -1,7 +1,4 @@
-"""Unit tests for common perception (OCR grouping, product heuristic, chrome).
-
-Pack-based consent and window selection — no site dictionaries.
-"""
+"""Unit tests for common perception and geometry-only browser chrome."""
 
 import pytest
 
@@ -13,7 +10,12 @@ from hpcu.perception.engine import (
     looks_like_product,
     merge_into_lines,
 )
-from hpcu.perception.window_chrome import content_roi, is_in_chrome, omnibox_point, primary_window
+from hpcu.perception.window_chrome import (
+    content_roi,
+    is_in_chrome,
+    omnibox_point,
+    primary_window,
+)
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.targeting import TargetingPack
@@ -44,8 +46,8 @@ def test_looks_like_product_requires_price():
     assert looks_like_product("") is False
     assert looks_like_product("원문 2026-08-21") is False
     assert looks_like_product("1 2 , 9 0 0 원") is True
-    assert looks_like_offer("구매하기") is False  # no price, no CTA markers
-    assert looks_like_offer("12,900원") is True  # price token
+    assert looks_like_offer("구매하기") is False
+    assert looks_like_offer("12,900원") is True
     assert looks_like_offer("결제하기") is False
 
 
@@ -69,14 +71,14 @@ def test_elements_from_ocr_tags_product_lines():
     regions = [_region("12,900", 10, 200, 40), _region("원", 55, 200, 16)]
     elements = elements_from_ocr(regions, scene_version=3)
     assert len(elements) == 1
-    assert elements[0].id == "ocr_line_0"
+    assert elements[0].id.startswith("ocr_line_")
+    assert elements[0].fingerprint.startswith("ocr:")
     assert elements[0].role == "product"
     assert elements[0].scene_version == 3
 
 
 @pytest.mark.unit
 def test_primary_window_prefers_largest():
-    """Geometry-only: largest window wins, no brand hints."""
     small = UIElement(
         id="term",
         scene_version=1,
@@ -149,7 +151,8 @@ def test_crop_png_shifts_origin():
     buffer = BytesIO()
     image.save(buffer, format="PNG")
     cropped, origin_x, origin_y = crop_png(
-        buffer.getvalue(), _bbox(10, 20, 40, 30)
+        buffer.getvalue(),
+        _bbox(10, 20, 40, 30),
     )
     assert origin_x == 10.0
     assert origin_y == 20.0
