@@ -3,7 +3,7 @@
 import random
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -64,12 +64,7 @@ class GatewayResponse:
 
 
 class Gateway(ABC):
-    """Provider-neutral semantic gateway contract.
-
-    The selected deployment is configuration, not a production code
-    constant. CPU perception may produce neutral scene facts, but semantic
-    decisions must cross this boundary with an explicit call purpose.
-    """
+    """Provider-neutral semantic gateway contract."""
 
     @property
     def provider_id(self) -> str:
@@ -80,6 +75,11 @@ class Gateway(ABC):
     def model_id(self) -> str:
         """Return the exact provider model identity when known."""
         return ""
+
+    @property
+    def inner_gateway(self) -> "Gateway | None":
+        """Expose a transparent wrapper edge without relying on `_inner`."""
+        return None
 
     @property
     def identity(self) -> SemanticIdentity | None:
@@ -118,30 +118,49 @@ class Gateway(ABC):
         ...
 
 
-# Transient error types to retry
+def walk_gateway_chain(gateway: Gateway) -> tuple[Gateway, ...]:
+    """Return wrapper layers once each, tolerating legacy transparent wrappers."""
+    chain: list[Gateway] = []
+    current: object | None = gateway
+    seen: set[int] = set()
+    while isinstance(current, Gateway) and id(current) not in seen:
+        seen.add(id(current))
+        chain.append(current)
+        next_gateway = current.inner_gateway
+        if next_gateway is None:
+            legacy = getattr(current, "_inner", None)
+            next_gateway = legacy if isinstance(legacy, Gateway) else None
+        current = next_gateway
+    return tuple(chain)
+
+
 _TRANSIENT_HTTP_STATUS = frozenset({429, 502, 503, 504})
 
 
 class RetryableGateway(Gateway):
-    """Transient-error retry wrapper around any Gateway.
-
-    Retries on network errors (ReadTimeout, ConnectError, RemoteProtocolError)
-    and HTTP 429/502/503/504 with exponential backoff + jitter.
-    Does NOT retry on 4xx (except 429) or schema errors.
-    """
+    """Retry transient provider failures with purpose-specific ceilings."""
 
     def __init__(
         self,
         inner: Gateway,
         *,
         max_retries: int = 2,
+        max_retries_by_purpose: Mapping[ModelCallPurpose, int] | None = None,
         base_delay_ms: int = 500,
         max_delay_ms: int = 8000,
+        sleep: Callable[[float], None] | None = None,
     ):
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if base_delay_ms < 0 or max_delay_ms < 0:
+            raise ValueError("retry delay values must be non-negative")
         self._inner = inner
         self._max_retries = max_retries
+        self._max_retries_by_purpose: dict[ModelCallPurpose, int] = {}
+        self.configure_retry_policy(max_retries_by_purpose or {})
         self._base_delay_ms = base_delay_ms
         self._max_delay_ms = max_delay_ms
+        self._sleep = sleep or time.sleep
 
     @property
     def provider_id(self) -> str:
@@ -151,15 +170,28 @@ class RetryableGateway(Gateway):
     def model_id(self) -> str:
         return self._inner.model_id
 
-    def __getattr__(self, name: str):
-        """Delegate attribute access to the inner gateway.
+    @property
+    def inner_gateway(self) -> Gateway:
+        return self._inner
 
-        This allows CountingGateway-specific attributes (call_count,
-        error_count, tokens, ai_calls, require_configured_identity, etc.)
-        to be accessed transparently through the retry wrapper.
-        """
-        # Avoid infinite recursion: __getattr__ is only called when the
-        # attribute is not found through normal lookup.
+    def configure_retry_policy(
+        self,
+        policy: Mapping[ModelCallPurpose, int],
+    ) -> None:
+        normalized: dict[ModelCallPurpose, int] = {}
+        for raw_purpose, raw_limit in policy.items():
+            purpose = ModelCallPurpose(raw_purpose)
+            limit = int(raw_limit)
+            if limit < 0:
+                raise ValueError("purpose retry limits must be non-negative")
+            normalized[purpose] = limit
+        self._max_retries_by_purpose = normalized
+
+    def retry_limit(self, purpose: ModelCallPurpose) -> int:
+        return self._max_retries_by_purpose.get(purpose, self._max_retries)
+
+    def __getattr__(self, name: str):
+        """Delegate telemetry and adapter-specific attributes transparently."""
         return getattr(self._inner, name)
 
     def call(
@@ -170,34 +202,36 @@ class RetryableGateway(Gateway):
         *,
         purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
     ) -> GatewayResponse:
+        if not isinstance(purpose, ModelCallPurpose):
+            purpose = ModelCallPurpose(purpose)
         last_error: Exception | None = None
         attempt_hook = _RETRY_ATTEMPT_HOOK.get()
-        for attempt in range(self._max_retries + 1):
+        retry_limit = self.retry_limit(purpose)
+        for attempt in range(retry_limit + 1):
             if attempt_hook is not None:
                 attempt_hook(purpose)
             try:
                 return self._inner.call(
-                    prompt, system_prompt, max_tokens, purpose=purpose
+                    prompt,
+                    system_prompt,
+                    max_tokens,
+                    purpose=purpose,
                 )
             except Exception as exc:
                 last_error = exc
-                if attempt == self._max_retries:
-                    raise
-                if not self._is_transient(exc):
+                if attempt == retry_limit or not self._is_transient(exc):
                     raise
                 delay_ms = min(
-                    self._base_delay_ms * (2 ** attempt)
+                    self._base_delay_ms * (2**attempt)
                     + random.randint(0, self._base_delay_ms),
                     self._max_delay_ms,
                 )
-                time.sleep(delay_ms / 1000.0)
+                self._sleep(delay_ms / 1000.0)
         raise last_error  # type: ignore[misc]
 
     @staticmethod
     def _is_transient(exc: Exception) -> bool:
-        """Return True when the error is likely transient and worth retrying."""
         name = type(exc).__name__
-        # httpx errors
         if name in (
             "ReadTimeout",
             "ConnectError",
@@ -207,7 +241,6 @@ class RetryableGateway(Gateway):
             "WriteError",
         ):
             return True
-        # HTTP status errors (httpx.HTTPStatusError)
         if hasattr(exc, "response") and hasattr(exc.response, "status_code"):
             return exc.response.status_code in _TRANSIENT_HTTP_STATUS
         return False
