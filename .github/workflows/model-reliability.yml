@@ -37,6 +37,7 @@ jobs:
         run: >-
           python -m ruff check
           hpcu/gateway
+          hpcu/runtime_core/task_budget.py
           hpcu/schemas/decision.py
           hpcu/compiler/targeting_compiler.py
           hpcu/cases/__main__.py
@@ -48,6 +49,8 @@ jobs:
           tests/unit/test_model_response_framing.py
           tests/unit/test_targeting_compiler_reliability.py
           tests/unit/test_gateway_assembly.py
+          tests/unit/test_task_budget_retry.py
+          tests/unit/test_product_runtime_boundary.py
           tests/unit/test_run_manifest.py
           tests/unit/test_minimax_diagnostic_normalization.py
       - name: Focused tests
@@ -61,5 +64,7 @@ jobs:
           tests/unit/test_model_response_framing.py
           tests/unit/test_targeting_compiler_reliability.py
           tests/unit/test_gateway_assembly.py
+          tests/unit/test_task_budget_retry.py
+          tests/unit/test_product_runtime_boundary.py
           tests/unit/test_run_manifest.py
           tests/unit/test_minimax_diagnostic_normalization.py

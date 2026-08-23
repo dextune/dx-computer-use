@@ -44,6 +44,7 @@ jobs:
         run: >-
           python -m ruff check
           hpcu/compiler/targeting_compiler.py
+          hpcu/gateway/gateway.py
           hpcu/grounder/grounder.py
           hpcu/planning
           hpcu/router/router.py
@@ -55,6 +56,8 @@ jobs:
           tests/unit/test_plan_runtime_contract.py
           tests/unit/test_temporal_runtime.py
           tests/unit/test_runtime_remediation.py
+          tests/unit/test_task_budget_retry.py
+          tests/unit/test_product_runtime_boundary.py
           tests/unit/test_cases.py
           tests/unit/test_control_loop.py
           tests/unit/test_grounder.py
@@ -81,6 +84,8 @@ jobs:
           tests/unit/test_plan_runtime_contract.py
           tests/unit/test_temporal_runtime.py
           tests/unit/test_runtime_remediation.py
+          tests/unit/test_task_budget_retry.py
+          tests/unit/test_product_runtime_boundary.py
           tests/unit/test_control_loop.py
           tests/unit/test_executor.py
           tests/unit/test_grounder.py
@@ -155,5 +160,7 @@ jobs:
               tests/unit/test_runtime_architecture.py \
               tests/unit/test_plan_runtime_contract.py \
               tests/unit/test_temporal_runtime.py \
+              tests/unit/test_task_budget_retry.py \
+              tests/unit/test_product_runtime_boundary.py \
               tests/integration/test_command_plan_runtime.py
           done
