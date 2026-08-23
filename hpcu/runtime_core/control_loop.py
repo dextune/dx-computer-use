@@ -150,27 +150,14 @@ class ControlLoop:
         if self._requires_target(query, action) and (
             grounding is None or not grounding.confident
         ):
-            # Navigate can fall back to the top ambiguous candidate.
-            if (
-                action.op is ActionOp.NAVIGATE
-                and grounding is not None
-                and grounding.failure_code is FailureCode.GROUNDING_AMBIGUOUS
-                and grounding.candidates
-            ):
-                grounding = GroundingResult(
-                    element_id=grounding.candidates[0].element_id,
-                    confidence=grounding.candidates[0].confidence,
-                    candidates=grounding.candidates,
-                )
-            else:
-                return StepResult(
-                    success=False,
-                    scene=pre_scene,
-                    failure_code=self._grounding_failure_code(grounding).value,
-                    skipped=True,
-                    grounding=grounding,
-                    pre_scene_version=pre_scene.version,
-                )
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=self._grounding_failure_code(grounding).value,
+                skipped=True,
+                grounding=grounding,
+                pre_scene_version=pre_scene.version,
+            )
 
         element_id = (
             grounding.element_id if grounding is not None else action.target.element_id
