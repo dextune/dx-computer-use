@@ -169,7 +169,7 @@ async def test_model_failure_never_uses_content_fallback_click():
     )
     stats = await runner.run_case(_spec())
     assert stats.success is False
-    assert stats.failure_code == "model_timeout"
+    assert stats.failure_code == "model_failed"
     assert not any(
         call[0] == "physical" and call[1] == "click"
         for call in injector.calls
@@ -210,13 +210,4 @@ async def test_blocked_pack_ends_in_human_handoff_without_retry():
     assert stats.outcome == "human_handoff"
     assert stats.handoff_required is True
     assert stats.failure_code == "access_control_blocked"
-    task_type_calls = [
-        call
-        for call in injector.calls
-        if call[0] == "physical" and call[1] == "type"
-    ]
-    assert len(task_type_calls) <= 1
-    assert not any(
-        call[0] == "physical" and call[1] == "key" and call[2] == "Enter"
-        for call in injector.calls
-    )
+    assert injector.calls == []
