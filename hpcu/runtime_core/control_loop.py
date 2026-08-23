@@ -31,6 +31,20 @@ from hpcu.verifier.verifier import Verifier
 _LOCAL_VERIFY_OPS = frozenset(
     {ActionOp.ASSERT, ActionOp.READ, ActionOp.CHECKPOINT}
 )
+_INTRINSIC_TARGET_OPS = frozenset(
+    {
+        ActionOp.INVOKE,
+        ActionOp.NAVIGATE,
+        ActionOp.CLICK,
+        ActionOp.DOUBLE_CLICK,
+        ActionOp.RIGHT_CLICK,
+        ActionOp.TYPE,
+        ActionOp.REPLACE_TEXT,
+        ActionOp.SELECT,
+        ActionOp.TOGGLE,
+        ActionOp.DRAG,
+    }
+)
 _TARGET_PLACEHOLDER = "$target"
 
 
@@ -431,10 +445,14 @@ class ControlLoop:
     @staticmethod
     def _requires_target(query: dict | None, action: Action) -> bool:
         # A supplied query is an explicit request to ground an abstract target;
-        # no operation may silently ignore its failure. Operations such as
-        # FOCUS_WINDOW may still run targetless when no query/element binding
-        # was requested at all.
-        return bool(query) or action.target.element_id is not None
+        # intrinsic pointer/text operations also fail before the executor when
+        # no target binding exists. FOCUS_WINDOW and global verification ops may
+        # remain targetless when no query/element binding was requested.
+        return bool(
+            query
+            or action.target.element_id is not None
+            or action.op in _INTRINSIC_TARGET_OPS
+        )
 
     @staticmethod
     def _bind_target(action: Action, element_id: str | None) -> Action:
