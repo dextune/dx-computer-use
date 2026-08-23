@@ -155,7 +155,19 @@ class ControlLoop:
         verification_query: dict | None = None,
     ) -> StepResult:
         """Run one deterministic cycle without invoking a semantic model."""
-        pre_scene = await self._observe_scene()
+        try:
+            pre_scene = await self._observe_scene()
+        except Exception as error:
+            failure = self._exception_failure_code(
+                error, FailureCode.CAPTURE_BACKEND_UNAVAILABLE
+            )
+            return StepResult(
+                success=False,
+                scene=self._scene,
+                failure_code=failure.value,
+                skipped=True,
+                pre_scene_version=self._scene.version,
+            )
 
         if action.op is ActionOp.WAIT_UNTIL:
             return await self._wait_until(query, action, pre_scene)
@@ -245,7 +257,24 @@ class ControlLoop:
                 recovery_action=recovery,
             )
 
-        post_scene = await self._observe_scene()
+        try:
+            post_scene = await self._observe_scene()
+        except Exception as error:
+            detection, recovery = self._remember_attempt(targeted, pre_scene)
+            failure = self._exception_failure_code(
+                error, FailureCode.CAPTURE_BACKEND_UNAVAILABLE
+            )
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=self._failure_after_recovery(failure.value, recovery),
+                grounding=grounding,
+                execution=execution,
+                pre_scene_version=pre_scene.version,
+                loop_detection=detection,
+                recovery_action=recovery,
+            )
+
         verified_action = targeted
         verification_grounding = None
         if verification_query:
@@ -371,7 +400,21 @@ class ControlLoop:
                     post_scene_version=scene.version,
                 )
             await self._sleep(self._wait_poll_interval_ms / 1000.0)
-            scene = await self._observe_scene()
+            try:
+                scene = await self._observe_scene()
+            except Exception as error:
+                failure = self._exception_failure_code(
+                    error, FailureCode.CAPTURE_BACKEND_UNAVAILABLE
+                )
+                return StepResult(
+                    success=False,
+                    scene=scene,
+                    failure_code=failure.value,
+                    skipped=True,
+                    grounding=last_grounding,
+                    pre_scene_version=initial_scene.version,
+                    post_scene_version=scene.version,
+                )
 
     async def _observe_scene(self) -> Scene:
         delta = await self._observer.observe()
@@ -425,6 +468,17 @@ class ControlLoop:
         if grounding is not None and grounding.failure_code is not None:
             return grounding.failure_code
         return FailureCode.GROUNDING_NO_CANDIDATES
+
+    @staticmethod
+    def _exception_failure_code(
+        error: Exception,
+        fallback: FailureCode,
+    ) -> FailureCode:
+        raw = getattr(error, "failure_code", fallback.value)
+        try:
+            return FailureCode(raw)
+        except (TypeError, ValueError):
+            return fallback
 
     def _resolve_target(
         self, query: dict | None, action: Action, scene: Scene
