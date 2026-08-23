@@ -43,7 +43,7 @@ def test_blocked_tokens_change_plan_hash():
 
 
 def test_blocked_tokens_are_canonicalized_to_immutable_tuples():
-    source = ["captcha"]
+    source = [" captcha "]
     context = PlanningContext(blocked_tokens=source)
     plan = _plan(source)
 
@@ -51,3 +51,11 @@ def test_blocked_tokens_are_canonicalized_to_immutable_tuples():
 
     assert context.blocked_tokens == ("captcha",)
     assert plan.blocked_tokens == ("captcha",)
+
+
+def test_blocked_tokens_reject_non_strings():
+    with pytest.raises(ValueError, match="non-empty strings"):
+        PlanningContext(blocked_tokens=(123,))
+
+    with pytest.raises(ValueError, match="non-empty strings"):
+        _plan((123,))
