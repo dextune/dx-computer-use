@@ -40,7 +40,6 @@ class FailureCode(str, Enum):
     ACTION_UNSUPPORTED = "action_unsupported"
     PRECONDITION_UNMET = "precondition_unmet"
     ACTION_REJECTED_BY_POLICY = "action_rejected_by_policy"
-    ACTION_UNSUPPORTED = "action_unsupported"
 
     # --- verification ---
     VERIFICATION_FAILED = "verification_failed"
