@@ -151,7 +151,7 @@ class ControlLoop:
             return StepResult(
                 success=False,
                 scene=pre_scene,
-                failure_code=FailureCode.GROUNDING_NO_CANDIDATES.value,
+                failure_code=self._grounding_failure_code(grounding).value,
                 skipped=True,
                 grounding=grounding,
                 pre_scene_version=pre_scene.version,
@@ -243,7 +243,10 @@ class ControlLoop:
                     success=False,
                     scene=post_scene,
                     failure_code=self._failure_after_recovery(
-                        FailureCode.VERIFICATION_FAILED.value, recovery
+                        self._grounding_failure_code(
+                            verification_grounding
+                        ).value,
+                        recovery,
                     ),
                     grounding=grounding,
                     verification_grounding=verification_grounding,
@@ -398,6 +401,14 @@ class ControlLoop:
         if recovery is RecoveryAction.HALT:
             return FailureCode.LOOP_DETECTED.value
         return failure_code or FailureCode.UNKNOWN.value
+
+    @staticmethod
+    def _grounding_failure_code(
+        grounding: GroundingResult | None,
+    ) -> FailureCode:
+        if grounding is not None and grounding.failure_code is not None:
+            return grounding.failure_code
+        return FailureCode.GROUNDING_NO_CANDIDATES
 
     def _resolve_target(
         self, query: dict | None, action: Action, scene: Scene

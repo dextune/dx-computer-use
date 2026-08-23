@@ -2,8 +2,12 @@
 
 import pytest
 
-from hpcu.compiler.targeting_compiler import TargetingCompiler
+from hpcu.compiler.targeting_compiler import (
+    TargetingCompilationError,
+    TargetingCompiler,
+)
 from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
+from hpcu.schemas.failure_codes import FailureCode
 
 pytestmark = pytest.mark.unit
 
@@ -61,19 +65,47 @@ class _Gateway(Gateway):
 def test_invalid_plan_never_triggers_second_logical_call():
     gateway = _Gateway(content="not json")
     compiler = TargetingCompiler(gateway, config=CONFIG)
-    pack = compiler.compile("case", "노트북을 검색해줘")
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case", "노트북을 검색해줘")
+
     assert gateway.calls == 1
-    assert pack.source == "goal_tokens"
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
     assert compiler.last_diagnostic == "schema_error:no_unique_targeting_object"
 
 
 def test_gateway_failure_never_triggers_second_logical_call():
     gateway = _Gateway(error=RuntimeError("down"))
     compiler = TargetingCompiler(gateway, config=CONFIG)
-    pack = compiler.compile("case", "노트북을 검색해줘")
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case", "노트북을 검색해줘")
+
     assert gateway.calls == 1
-    assert pack.source == "goal_tokens"
+    assert captured.value.failure_code == FailureCode.MODEL_FAILED.value
     assert compiler.last_diagnostic == "gateway_error:RuntimeError"
+
+
+def test_gateway_failure_preserves_typed_budget_code():
+    class _BudgetError(RuntimeError):
+        failure_code = FailureCode.MODEL_BUDGET_EXHAUSTED.value
+
+    gateway = _Gateway(error=_BudgetError("exhausted"))
+    compiler = TargetingCompiler(gateway, config=CONFIG)
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case", "노트북을 검색해줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_BUDGET_EXHAUSTED.value
+
+
+def test_no_gateway_keeps_explicit_local_tokenizer_path():
+    compiler = TargetingCompiler(config=CONFIG)
+
+    pack = compiler.compile("case", "노트북을 검색해줘")
+
+    assert pack.source == "goal_tokens"
+    assert compiler.last_diagnostic == "gateway_unavailable"
 
 
 def test_diagnostic_object_is_ignored_before_unique_targeting_object():
@@ -90,13 +122,16 @@ def test_conflicting_targeting_objects_fail_closed():
     second = _VALID.replace('"pick_query":"item"', '"pick_query":"other"')
     gateway = _Gateway(content=_VALID + "\n" + second)
     compiler = TargetingCompiler(gateway, config=CONFIG)
-    pack = compiler.compile("case", "item을 찾아줘")
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case", "item을 찾아줘")
+
     assert gateway.calls == 1
-    assert pack.source == "goal_tokens"
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
     assert compiler.last_diagnostic == "schema_error:no_unique_targeting_object"
 
 
-def test_wrong_list_field_type_falls_back_without_coercion():
+def test_wrong_list_field_type_fails_closed_without_coercion():
     gateway = _Gateway(
         content=_VALID.replace(
             '"ready_any":["ready"]',
@@ -104,8 +139,11 @@ def test_wrong_list_field_type_falls_back_without_coercion():
         )
     )
     compiler = TargetingCompiler(gateway, config=CONFIG)
-    pack = compiler.compile("case", "item을 찾아줘")
-    assert pack.source == "goal_tokens"
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case", "item을 찾아줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
     assert "ready_any must be an array of strings" in compiler.last_diagnostic
 
 

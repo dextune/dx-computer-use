@@ -3,7 +3,13 @@ name: model-reliability
 on:
   push:
     branches:
-      - codex/model-reliability-5x-20260823
+      - main
+      - "codex/**"
+    paths:
+      - "hpcu/**"
+      - "tests/**"
+      - "config/**"
+      - ".github/workflows/model-reliability.yml"
   pull_request:
     paths:
       - "hpcu/**"

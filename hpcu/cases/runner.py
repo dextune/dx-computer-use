@@ -7,6 +7,7 @@ import time
 
 from hpcu.cases.specs import CaseSpec
 from hpcu.cases.stats import ActionRecord, CaseStats, EvidenceRecord
+from hpcu.compiler.targeting_compiler import TargetingCompilationError
 from hpcu.runtime_core.product_runtime import (
     CommandRequest,
     CommandRuntime,
@@ -73,6 +74,14 @@ class CaseRunner:
                 stats,
                 FailureCode.DECISION_REQUIRED,
                 "unresolved_goal",
+            )
+            stats.elapsed_ms = int((self._monotonic() - started) * 1000)
+            return stats
+        except TargetingCompilationError as error:
+            self._fail_before_runtime(
+                stats,
+                self._targeting_failure_code(error),
+                error.diagnostic,
             )
             stats.elapsed_ms = int((self._monotonic() - started) * 1000)
             return stats
@@ -148,6 +157,15 @@ class CaseRunner:
             )
         stats.elapsed_ms = int((self._monotonic() - started) * 1000)
         return stats
+
+    @staticmethod
+    def _targeting_failure_code(
+        error: TargetingCompilationError,
+    ) -> FailureCode:
+        try:
+            return FailureCode(error.failure_code)
+        except ValueError:
+            return FailureCode.MODEL_FAILED
 
     @staticmethod
     def _evidence_record(binding) -> EvidenceRecord:

@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 
 from hpcu.router.candidate_scoring import TargetQuery, score_candidates
 from hpcu.runtime_config import load_runtime_config
+from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
 
 
@@ -28,6 +29,7 @@ class GroundingResult:
     element_id: Optional[str]
     confidence: float
     candidates: tuple[GroundingCandidate, ...]
+    failure_code: FailureCode | None = None
 
     @property
     def is_resolved(self) -> bool:
@@ -75,7 +77,12 @@ class Grounder:
             for item in scored
         )
         if not ranked:
-            return GroundingResult(element_id=None, confidence=0.0, candidates=())
+            return GroundingResult(
+                element_id=None,
+                confidence=0.0,
+                candidates=(),
+                failure_code=FailureCode.GROUNDING_NO_CANDIDATES,
+            )
 
         threshold = float(
             target_query.get("confidence_threshold", self._confidence_threshold)
@@ -84,11 +91,17 @@ class Grounder:
         top = ranked[0]
         if top.confidence < threshold:
             return GroundingResult(
-                element_id=None, confidence=top.confidence, candidates=ranked
+                element_id=None,
+                confidence=top.confidence,
+                candidates=ranked,
+                failure_code=FailureCode.GROUNDING_CONFIDENCE_LOW,
             )
         if len(ranked) >= 2 and top.confidence - ranked[1].confidence < min_margin:
             return GroundingResult(
-                element_id=None, confidence=top.confidence, candidates=ranked
+                element_id=None,
+                confidence=top.confidence,
+                candidates=ranked,
+                failure_code=FailureCode.GROUNDING_AMBIGUOUS,
             )
         return GroundingResult(
             element_id=top.element_id,

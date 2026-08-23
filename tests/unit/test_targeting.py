@@ -6,10 +6,15 @@ All T1 components — model 0 call, pure data, pure string processing.
 import pytest
 
 from hpcu.cases.stats import DEFAULT_PROVIDER_ID, CountingGateway
-from hpcu.compiler.targeting_compiler import GoalFallbackTokenizer, TargetingCompiler
+from hpcu.compiler.targeting_compiler import (
+    GoalFallbackTokenizer,
+    TargetingCompilationError,
+    TargetingCompiler,
+)
 from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
 from hpcu.perception.matcher import GenericMatcher, mentions
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace
+from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.targeting import TargetingPack
 from hpcu.schemas.ui_element import UIElement
@@ -334,23 +339,27 @@ def test_compiler_no_gateway_falls_back():
 
 
 @pytest.mark.unit
-def test_compiler_broken_json_falls_back():
+def test_compiler_broken_json_fails_closed():
     inner = _FakeGateway(content="not valid json at all {{{")
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
-    pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    assert pack.source == "goal_tokens"
-    assert "생수" in pack.ready_any
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case-1", "쿠팡에서 생수 골라줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
 
 
 @pytest.mark.unit
-def test_compiler_gateway_error_falls_back():
+def test_compiler_gateway_error_fails_closed():
     inner = _FakeGateway(error=True)
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
-    pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    assert pack.source == "goal_tokens"
-    assert "생수" in pack.ready_any
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case-1", "쿠팡에서 생수 골라줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_FAILED.value
 
 
 @pytest.mark.unit
@@ -372,24 +381,32 @@ def test_compiler_rejects_non_boolean_pick_required():
     inner = _FakeGateway(content=_valid_targeting_json(pick_required='"false"'))
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
-    pack = compiler.compile("case-1", "item을 열어줘")
-    assert pack.source == "goal_tokens"
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case-1", "item을 열어줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
 
 
 @pytest.mark.unit
-def test_compiler_schema_mismatch_falls_back():
+def test_compiler_schema_mismatch_fails_closed():
     inner = _FakeGateway(content='{"unknown_field": "value"}')
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
-    pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    assert pack.source == "goal_tokens"
-    assert "생수" in pack.ready_any
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case-1", "쿠팡에서 생수 골라줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value
 
 
 @pytest.mark.unit
-def test_compiler_non_dict_response_falls_back():
+def test_compiler_non_dict_response_fails_closed():
     inner = _FakeGateway(content="[1, 2, 3]")
     gateway = CountingGateway(inner)
     compiler = TargetingCompiler(gateway)
-    pack = compiler.compile("case-1", "쿠팡에서 생수 골라줘")
-    assert pack.source == "goal_tokens"
+
+    with pytest.raises(TargetingCompilationError) as captured:
+        compiler.compile("case-1", "쿠팡에서 생수 골라줘")
+
+    assert captured.value.failure_code == FailureCode.MODEL_SCHEMA_INVALID.value

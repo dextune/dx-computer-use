@@ -6,6 +6,7 @@ Pure scene matching; no model or platform is involved.
 import pytest
 
 from hpcu.grounder.grounder import Grounder, GroundingCandidate, GroundingResult
+from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
@@ -39,6 +40,7 @@ def test_resolve_exact_text_match_wins():
     # Then the exact match is grounded
     assert result.is_resolved is True
     assert result.element_id == "login"
+    assert result.failure_code is None
 
 
 @pytest.mark.unit
@@ -86,6 +88,7 @@ def test_resolve_no_candidates_returns_unresolved():
     # Then the result is unresolved with an empty candidate list
     assert result.is_resolved is False
     assert result.element_id is None
+    assert result.failure_code is FailureCode.GROUNDING_NO_CANDIDATES
 
 
 @pytest.mark.unit
@@ -185,6 +188,7 @@ def test_resolve_threshold_drops_all_candidates():
     # Then nothing clears the threshold and the result is unresolved
     assert result.is_resolved is False
     assert result.element_id is None
+    assert result.failure_code is FailureCode.GROUNDING_CONFIDENCE_LOW
 
 
 @pytest.mark.unit
@@ -202,6 +206,7 @@ def test_resolve_ambiguous_when_top_two_close():
     # Then the top two are separated by less than the margin -> unresolved
     assert result.element_id is None
     assert len(result.candidates) == 2
+    assert result.failure_code is FailureCode.GROUNDING_AMBIGUOUS
 
 
 @pytest.mark.unit
@@ -218,18 +223,28 @@ def test_resolve_case_insensitive():
 
 
 @pytest.mark.unit
-@pytest.mark.unit
 def test_grounder_uses_injected_config_threshold():
     config = {"confidence": {"local_execute_threshold": 0.99, "local_margin_min": 0.0}}
     grounder = Grounder(config=config)
     scene = make_scene(make_element("login", name="로그인", role="button"))
     result = grounder.resolve({"text": "로그인"}, scene)
     assert result.element_id is None
+    assert result.failure_code is FailureCode.GROUNDING_CONFIDENCE_LOW
 
 
 def test_grounding_result_is_resolved_property():
     # Given an unresolved and a resolved result
     # When the is_resolved property is read
     # Then it reflects a grounded element id with positive confidence
-    assert GroundingResult(element_id=None, confidence=0.0, candidates=()).is_resolved is False
-    assert GroundingResult(element_id="x", confidence=0.9, candidates=()).is_resolved is True
+    unresolved = GroundingResult(
+        element_id=None,
+        confidence=0.0,
+        candidates=(),
+    )
+    resolved = GroundingResult(
+        element_id="x",
+        confidence=0.9,
+        candidates=(),
+    )
+    assert unresolved.is_resolved is False
+    assert resolved.is_resolved is True
