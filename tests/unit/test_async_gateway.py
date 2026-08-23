@@ -44,6 +44,19 @@ class _NativeAsyncGateway(_ThreadGateway):
         return GatewayResponse(content="{}", model="fake")
 
 
+class _ProviderTimeoutGateway(_ThreadGateway):
+    async def acall(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
+        del prompt, system_prompt, max_tokens, purpose
+        raise TimeoutError("provider timeout")
+
+
 @pytest.mark.asyncio
 async def test_sync_gateway_does_not_block_event_loop():
     gateway = _ThreadGateway()
@@ -72,6 +85,18 @@ async def test_native_async_gateway_timeout_is_typed():
             "ping",
             timeout_ms=1,
         )
+
+
+@pytest.mark.asyncio
+async def test_provider_timeout_is_not_reclassified_as_runtime_deadline():
+    with pytest.raises(TimeoutError, match="provider timeout") as exc_info:
+        await call_gateway_async(
+            _ProviderTimeoutGateway(),
+            "ping",
+            timeout_ms=100,
+        )
+
+    assert type(exc_info.value) is TimeoutError
 
 
 @pytest.mark.asyncio
