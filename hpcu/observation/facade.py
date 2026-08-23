@@ -19,6 +19,10 @@ from hpcu.schemas.scene import FrameHandle, Scene, SceneDelta
 from hpcu.schemas.ui_element import UIElement
 
 
+class ObservationTransactionTimeout(TimeoutError):
+    """The observer's own transaction deadline expired."""
+
+
 @dataclass
 class _Metric:
     count: int = 0
@@ -105,33 +109,50 @@ class CompositeObserver(Observer):
                 performance = {}
             timeout_ms = performance.get("observe_timeout_ms")
 
-        if timeout_ms is not None and not isinstance(timeout_ms, (int, float)):
-            timeout_ms = None
+        if timeout_ms is not None:
+            if not isinstance(timeout_ms, (int, float)):
+                timeout_ms = None
+            elif timeout_ms <= 0:
+                raise ValueError("observe_timeout_ms must be positive")
 
+        metric = self.performance_snapshot.capture_structure_transaction
         t0 = asyncio.get_running_loop().time() * 1000
+        transaction = asyncio.create_task(self._observe_transaction())
         try:
-            if timeout_ms is not None:
-                try:
-                    result = await asyncio.wait_for(
-                        self._observe_transaction(),
-                        timeout=timeout_ms / 1000.0,
-                    )
-                except asyncio.TimeoutError:
-                    metric = self.performance_snapshot.capture_structure_transaction
-                    metric.timeout_count += 1
-                    raise asyncio.TimeoutError("observation transaction timed out") from None
+            if timeout_ms is None:
+                result = await transaction
             else:
-                result = await self._observe_transaction()
-        except asyncio.TimeoutError:
+                done, _pending = await asyncio.wait(
+                    {transaction},
+                    timeout=timeout_ms / 1000.0,
+                )
+                if transaction not in done:
+                    await self._cancel_and_wait(transaction)
+                    metric.timeout_count += 1
+                    raise ObservationTransactionTimeout(
+                        "observation transaction timed out"
+                    )
+                result = transaction.result()
+        except ObservationTransactionTimeout:
+            raise
+        except asyncio.CancelledError:
+            await self._cancel_and_wait(transaction)
             raise
         except Exception:
-            self.performance_snapshot.capture_structure_transaction.error_count += 1
+            metric.error_count += 1
+            await self._cancel_and_wait(transaction)
             raise
         else:
             elapsed = int(asyncio.get_running_loop().time() * 1000 - t0)
-            metric = self.performance_snapshot.capture_structure_transaction
             metric.total_latency_ms += elapsed
         return result
+
+    @staticmethod
+    async def _cancel_and_wait(task: asyncio.Task[SceneDelta]) -> None:
+        if task.done():
+            return
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
     async def _observe_transaction(self) -> SceneDelta:
         """Grab frame and read structure in parallel, then build delta."""
@@ -185,6 +206,9 @@ class CompositeObserver(Observer):
                     await self._capture_backend.start()
                     self._capture_started = True
                 result = await self._capture_backend.grab()
+        except TimeoutError:
+            metric.timeout_count += 1
+            raise
         except Exception:
             metric.error_count += 1
             raise
@@ -204,6 +228,9 @@ class CompositeObserver(Observer):
             else:
                 snapshot = await self._structure_observer.observe_structure()
                 result = {element.id: element for element in snapshot}
+        except TimeoutError:
+            metric.timeout_count += 1
+            raise
         except Exception:
             metric.error_count += 1
             raise
