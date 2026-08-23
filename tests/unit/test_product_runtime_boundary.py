@@ -9,10 +9,18 @@ from hpcu.gateway.gateway import (
     RetryableGateway,
 )
 from hpcu.runtime_core.product_runtime import CommandRuntime
-from hpcu.runtime_core.task_budget import BudgetedGateway, TaskBudgetLedger
+from hpcu.runtime_core.task_budget import (
+    BudgetedGateway,
+    ModelBudgetExceeded,
+    TaskBudgetLedger,
+)
 from hpcu.schemas.budget import TaskBudgetSpec
 
 pytestmark = pytest.mark.unit
+
+
+class ConnectError(Exception):
+    """Transient error name recognized by RetryableGateway."""
 
 
 class _Gateway(Gateway):
@@ -41,6 +49,30 @@ class _Gateway(Gateway):
             content="{}",
             model=self.model_id,
             provider=self.provider_id,
+        )
+
+
+class _FlakyGateway(_Gateway):
+    def __init__(self) -> None:
+        super().__init__()
+        self.attempts = 0
+
+    def call(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        max_tokens: int | None = None,
+        *,
+        purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
+    ) -> GatewayResponse:
+        self.attempts += 1
+        if self.attempts == 1:
+            raise ConnectError("transient")
+        return super().call(
+            prompt,
+            system_prompt,
+            max_tokens,
+            purpose=purpose,
         )
 
 
@@ -110,3 +142,26 @@ def test_command_runtime_preserves_existing_retry_boundary():
 
     assert isinstance(gateway, BudgetedGateway)
     assert gateway._inner is retrying
+
+
+def test_command_runtime_auto_retry_cannot_bypass_task_budget():
+    inner = _FlakyGateway()
+    runtime = CommandRuntime(
+        lambda: object(),
+        provider_gateway=inner,
+        config=_config(),
+    )
+    ledger = TaskBudgetLedger(
+        TaskBudgetSpec(
+            max_model_calls=1,
+            max_model_tokens=100,
+            max_model_latency_ms=1000,
+        )
+    )
+    gateway = runtime._semantic_gateway(ledger)
+
+    with pytest.raises(ModelBudgetExceeded, match="model-call"):
+        gateway.call("compile", purpose=ModelCallPurpose.PLAN_COMPILE)
+
+    assert inner.attempts == 1
+    assert ledger.model_calls == 1
