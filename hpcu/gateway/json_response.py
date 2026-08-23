@@ -1,9 +1,10 @@
 """Schema-directed JSON extraction for provider response text.
 
 The semantic provider sometimes surrounds the intended object with prose,
-reasoning metadata, markdown fences, or a non-semantic wrapper object.  This
-module performs transport-level framing only: it never invents fields or
-changes field values.  Callers still validate the selected object strictly.
+reasoning metadata, markdown fences, or a non-semantic wrapper object. This
+module performs transport-level framing only: it never invents fields, repairs
+invalid JSON, or changes field values. Callers still validate the selected
+object strictly.
 """
 
 from __future__ import annotations
@@ -27,43 +28,14 @@ def _walk_objects(value: Any) -> Iterable[dict[str, Any]]:
             yield from _walk_objects(nested)
 
 
-def _bracket_count_extract(content: str, start: int) -> str | None:
-    """Extract a balanced-brace substring from *start*, or None."""
-    depth = 0
-    in_string = False
-    escape = False
-    for i in range(start, len(content)):
-        ch = content[i]
-        if escape:
-            escape = False
-            continue
-        if ch == "\\":
-            escape = True
-            continue
-        if ch == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return content[start : i + 1]
-    return None
-
-
 def extract_json_objects(content: str) -> tuple[dict[str, Any], ...]:
-    """Return distinct JSON objects found in *content*, in encounter order.
+    """Return distinct valid JSON objects found in *content*, in encounter order.
 
-    ``json.JSONDecoder.raw_decode`` is attempted at every opening brace.  When
-    ``raw_decode`` fails, a bracket-counting fallback extracts the balanced
-    brace span and retries via ``json.loads``.  This handles prose, markdown
-    fences, sequential objects, and wrapper objects without relying on regex.
-    Nested objects are exposed as candidates so a provider envelope such as
-    ``{"response": {...}}`` remains a transport concern rather than a schema
-    repair.
+    The decoder starts only at opening braces. After a successful top-level
+    decode, nested objects are emitted by ``_walk_objects`` and the scanner
+    jumps to the decoded span's end instead of reparsing every nested brace.
+    Invalid JSON is never repaired here; fail-closed schema handling belongs to
+    the caller.
     """
     if not isinstance(content, str):
         raise ValueError("response content must be a string")
@@ -71,25 +43,21 @@ def extract_json_objects(content: str) -> tuple[dict[str, Any], ...]:
     decoder = json.JSONDecoder()
     candidates: list[dict[str, Any]] = []
     fingerprints: set[str] = set()
+    cursor = 0
 
-    for start, char in enumerate(content):
-        if char != "{":
-            continue
-        value = None
+    while True:
+        start = content.find("{", cursor)
+        if start < 0:
+            break
         try:
-            value, _end = decoder.raw_decode(content, start)
+            value, end = decoder.raw_decode(content, start)
         except json.JSONDecodeError:
-            # Fall back to bracket-counted extraction for malformed provider
-            # responses that raw_decode cannot parse (e.g. extra trailing
-            # commas, unquoted keys, or deeply nested prose).
-            span = _bracket_count_extract(content, start)
-            if span is not None:
-                try:
-                    value = json.loads(span)
-                except json.JSONDecodeError:
-                    continue
-        if value is None:
+            # This opening brace may belong to prose/a string or an invalid
+            # object. Advance one character so a later valid object can still
+            # be discovered without attempting to repair provider output.
+            cursor = start + 1
             continue
+
         for payload in _walk_objects(value):
             fingerprint = json.dumps(
                 payload,
@@ -101,6 +69,8 @@ def extract_json_objects(content: str) -> tuple[dict[str, Any], ...]:
                 continue
             fingerprints.add(fingerprint)
             candidates.append(payload)
+
+        cursor = max(start + 1, end)
 
     return tuple(candidates)
 
@@ -115,11 +85,11 @@ def select_json_object(
     """Select the unique object matching the caller's structural contract.
 
     Selection is fail-closed: non-matching reasoning/wrapper objects are
-    ignored and identical duplicate objects are de-duplicated.  Extra keys
+    ignored and identical duplicate objects are de-duplicated. Extra keys
     beyond *required_keys* are tolerated — provider responses may include
     optional metadata or diagnostics that do not affect the schema contract.
     When *allowed_keys* is supplied it acts as a tie-breaker hint for
-    ambiguous matches, not as a strict key‑set equivalence check.
+    ambiguous matches, not as a strict key-set equivalence check.
     """
     required = frozenset(required_keys)
     allowed = frozenset(allowed_keys) if allowed_keys is not None else None
