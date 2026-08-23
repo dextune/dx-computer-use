@@ -61,15 +61,17 @@ class PlanningContext:
     def __post_init__(self) -> None:
         queries = dict(self.target_queries)
         values = dict(self.values)
+        blocked_tokens = tuple(self.blocked_tokens)
         if any(not key.strip() for key in queries):
             raise ValueError("planning-context query names must be non-empty")
         if any(not key.strip() for key in values):
             raise ValueError("planning-context value names must be non-empty")
-        if any(not token.strip() for token in self.blocked_tokens):
+        if any(not token.strip() for token in blocked_tokens):
             raise ValueError("blocked_tokens must not contain empty strings")
         object.__setattr__(self, "target_queries", MappingProxyType(queries))
         object.__setattr__(self, "values", MappingProxyType(values))
         object.__setattr__(self, "allowed_ops", frozenset(self.allowed_ops))
+        object.__setattr__(self, "blocked_tokens", blocked_tokens)
 
     def require_query(self, name: str) -> TargetQuerySpec:
         try:
@@ -152,9 +154,10 @@ class PlanIR:
 
     def __post_init__(self) -> None:
         nodes = dict(self.nodes)
+        blocked_tokens = tuple(self.blocked_tokens)
         if not self.strategy_id.strip() or not self.compiler_version.strip():
             raise ValueError("strategy_id and compiler_version are required")
-        if any(not token.strip() for token in self.blocked_tokens):
+        if any(not token.strip() for token in blocked_tokens):
             raise ValueError("blocked_tokens must not contain empty strings")
         if self.entry_node_id not in nodes:
             raise ValueError("entry_node_id must reference an existing node")
@@ -171,6 +174,7 @@ class PlanIR:
             missing = sorted(set(nodes) - reachable)
             raise ValueError(f"PlanIR contains unreachable nodes: {missing!r}")
         object.__setattr__(self, "nodes", MappingProxyType(nodes))
+        object.__setattr__(self, "blocked_tokens", blocked_tokens)
 
     def _reachable(self, nodes: Mapping[str, PlanNode]) -> set[str]:
         pending = [self.entry_node_id]
@@ -195,6 +199,7 @@ class PlanIR:
             "nodes": [_node_payload(self.nodes[key]) for key in sorted(self.nodes)],
             "compiler": self.compiler_version,
             "lineage": list(self.patch_lineage),
+            "blocked": list(self.blocked_tokens),
         }
         raw = json.dumps(
             payload,
