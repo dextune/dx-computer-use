@@ -557,11 +557,7 @@ class TaskRuntime:
                     element_id=element_id,
                     scene_version=step.scene.version,
                     frame_id=frame_id,
-                    observed_text=str(
-                        element.text
-                        if element.text is not None
-                        else element.name or ""
-                    ).strip(),
+                    observed_text=str(element.text or element.name or "").strip(),
                     role=element.role,
                     fingerprint=element.fingerprint or "",
                     visible=element.state.visible,
@@ -650,11 +646,7 @@ class TaskRuntime:
         node: PlanNode,
         step: StepResult,
     ) -> bool:
-        return bool(
-            node.irreversible
-            and step.execution is not None
-            and step.execution.success
-        )
+        return bool(node.irreversible and step.action_attempted)
 
     @staticmethod
     def _failure_code(value: str | None) -> FailureCode:
