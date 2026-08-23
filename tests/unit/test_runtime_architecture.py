@@ -120,3 +120,24 @@ def test_task_results_are_constructed_only_by_terminal_commit():
 
     Visitor().visit(tree)
     assert calls_by_function == ["_commit_terminal"]
+
+
+def test_legacy_duplicate_runtime_modules_do_not_reappear():
+    forbidden = (
+        ".runtime-remediation-ready",
+        "hpcu/gateway/budget.py",
+        "hpcu/planning/compiler.py",
+        "hpcu/planning/interpreter.py",
+        "hpcu/runtime_core/performance_trace.py",
+        "hpcu/schemas/planning.py",
+        "schemas/plan.schema.json",
+    )
+    assert not [relative for relative in forbidden if (_ROOT / relative).exists()]
+
+    planning = _source("hpcu/planning/__init__.py")
+    assert "hpcu.planning.goal_interpreter" in planning
+    assert "hpcu.planning.plan_compiler" in planning
+
+    runtime = _source("hpcu/runtime_core/__init__.py")
+    assert "hpcu.runtime_core.performance" in runtime
+    assert "hpcu.runtime_core.task_budget" in runtime
