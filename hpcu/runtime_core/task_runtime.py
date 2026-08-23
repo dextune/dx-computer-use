@@ -172,6 +172,29 @@ class TaskRuntime:
 
         for step_number in range(1, limit + 1):
             node = current_plan.nodes[node_id]
+
+            if current_plan.blocked_tokens:
+                await self.control_loop._observe_scene()
+                scene = self.control_loop.scene
+                blob = " ".join(
+                    (element.text or element.name or "")
+                    for element in scene.elements.values()
+                ).casefold().replace(" ", "")
+                if any(
+                    token.casefold().replace(" ", "") in blob
+                    for token in current_plan.blocked_tokens
+                ):
+                    return self._commit_terminal(
+                        status=TaskStatus.HUMAN_HANDOFF,
+                        node_id=node_id,
+                        steps=step_number,
+                        last_step=last,
+                        failure_code=FailureCode.ACCESS_CONTROL_BLOCKED.value,
+                        completed=completed,
+                        evidence=evidence,
+                        plan=current_plan,
+                    )
+
             last = await self._run_node(node)
 
             if last.success:

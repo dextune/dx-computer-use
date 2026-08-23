@@ -194,7 +194,7 @@ async def test_step_unresolved_does_not_call_model():
     result = await loop.step({"text": "없는버튼"}, action)
     assert result.success is False
     assert result.skipped is True
-    assert result.failure_code == FailureCode.GROUNDING_NO_CANDIDATES.value
+    assert result.failure_code == FailureCode.GROUNDING_CONFIDENCE_LOW.value
     assert injector.semantic_calls == []
     assert recorder.model_call_count == 0
 

@@ -2,7 +2,7 @@
 title: "HPCU Runtime — 개발 태스크리스트"
 version: "1.2"
 date: "2026-08-22"
-parent: "docs/plan/00-overview-and-goals.md, docs/dev-init-001.md §25"
+parent: "docs/plan/00-overview-and-goals.md, docs/dev-init-001.md §25, docs/plan/17-remaining-work-plan.md"
 language: "ko-KR"
 scope: "project-wide, progress tracking"
 ---

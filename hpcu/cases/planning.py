@@ -213,6 +213,7 @@ class CasePlanningContextProvider:
             target_queries=queries,
             values=values,
             allowed_ops=frozenset(allowed),
+            blocked_tokens=pack.blocked_any,
         )
 
     @staticmethod

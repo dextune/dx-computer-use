@@ -95,13 +95,13 @@ def _config(*, provider: str = "fake", model: str = "fake-model") -> dict:
 
 
 def test_command_runtime_rejects_provider_or_model_drift():
-    with pytest.raises(ValueError, match="provider mismatch"):
+    with pytest.raises(ValueError, match="semantic gateway identity mismatch"):
         CommandRuntime(
             lambda: object(),
             provider_gateway=_Gateway(provider="other"),
             config=_config(),
         )
-    with pytest.raises(ValueError, match="model mismatch"):
+    with pytest.raises(ValueError, match="semantic gateway identity mismatch"):
         CommandRuntime(
             lambda: object(),
             provider_gateway=_Gateway(model="other-model"),

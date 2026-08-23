@@ -27,14 +27,43 @@ def _walk_objects(value: Any) -> Iterable[dict[str, Any]]:
             yield from _walk_objects(nested)
 
 
+def _bracket_count_extract(content: str, start: int) -> str | None:
+    """Extract a balanced-brace substring from *start*, or None."""
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(content)):
+        ch = content[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return content[start : i + 1]
+    return None
+
+
 def extract_json_objects(content: str) -> tuple[dict[str, Any], ...]:
     """Return distinct JSON objects found in *content*, in encounter order.
 
-    ``json.JSONDecoder.raw_decode`` is attempted at every opening brace.  This
-    handles prose, markdown fences, sequential objects, and wrapper objects
-    without relying on regex or brace counting.  Nested objects are exposed as
-    candidates so a provider envelope such as ``{"response": {...}}`` remains
-    a transport concern rather than a schema repair.
+    ``json.JSONDecoder.raw_decode`` is attempted at every opening brace.  When
+    ``raw_decode`` fails, a bracket-counting fallback extracts the balanced
+    brace span and retries via ``json.loads``.  This handles prose, markdown
+    fences, sequential objects, and wrapper objects without relying on regex.
+    Nested objects are exposed as candidates so a provider envelope such as
+    ``{"response": {...}}`` remains a transport concern rather than a schema
+    repair.
     """
     if not isinstance(content, str):
         raise ValueError("response content must be a string")
@@ -46,9 +75,20 @@ def extract_json_objects(content: str) -> tuple[dict[str, Any], ...]:
     for start, char in enumerate(content):
         if char != "{":
             continue
+        value = None
         try:
             value, _end = decoder.raw_decode(content, start)
         except json.JSONDecodeError:
+            # Fall back to bracket-counted extraction for malformed provider
+            # responses that raw_decode cannot parse (e.g. extra trailing
+            # commas, unquoted keys, or deeply nested prose).
+            span = _bracket_count_extract(content, start)
+            if span is not None:
+                try:
+                    value = json.loads(span)
+                except json.JSONDecodeError:
+                    continue
+        if value is None:
             continue
         for payload in _walk_objects(value):
             fingerprint = json.dumps(
@@ -74,19 +114,35 @@ def select_json_object(
 ) -> dict[str, Any]:
     """Select the unique object matching the caller's structural contract.
 
-    Selection is fail-closed.  Non-matching reasoning/wrapper objects are
-    ignored, identical duplicate objects are de-duplicated, and conflicting
-    objects that both satisfy the required key set are rejected as ambiguous.
+    Selection is fail-closed: non-matching reasoning/wrapper objects are
+    ignored and identical duplicate objects are de-duplicated.  Extra keys
+    beyond *required_keys* are tolerated — provider responses may include
+    optional metadata or diagnostics that do not affect the schema contract.
+    When *allowed_keys* is supplied it acts as a tie-breaker hint for
+    ambiguous matches, not as a strict key‑set equivalence check.
     """
     required = frozenset(required_keys)
     allowed = frozenset(allowed_keys) if allowed_keys is not None else None
     candidates = extract_json_objects(content)
-    matches = [
-        payload
-        for payload in candidates
-        if required <= payload.keys()
-        and (allowed is None or payload.keys() <= allowed)
-    ]
+    if allowed is not None:
+        # Prefer candidates whose keys are a subset of *allowed*, but also
+        # accept any candidate that satisfies the required keys alone.
+        perfect = [
+            payload
+            for payload in candidates
+            if required <= payload.keys() and payload.keys() <= allowed
+        ]
+        matches = perfect or [
+            payload
+            for payload in candidates
+            if required <= payload.keys()
+        ]
+    else:
+        matches = [
+            payload
+            for payload in candidates
+            if required <= payload.keys()
+        ]
 
     if len(matches) == 1:
         return matches[0]

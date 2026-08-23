@@ -56,6 +56,7 @@ class PlanningContext:
     allowed_ops: frozenset[ActionOp] = field(
         default_factory=lambda: frozenset(ActionOp)
     )
+    blocked_tokens: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         queries = dict(self.target_queries)
@@ -145,6 +146,7 @@ class PlanIR:
     task_budget: TaskBudgetSpec
     compiler_version: str = "1"
     patch_lineage: tuple[str, ...] = ()
+    blocked_tokens: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         nodes = dict(self.nodes)

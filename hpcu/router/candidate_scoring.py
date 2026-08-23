@@ -122,11 +122,26 @@ def _score_element(element: UIElement, query: TargetQuery) -> ScoredCandidate:
     source = _source_reliability(element)
     structure = _structure_match(element)
 
+    # When the query has no text, the text weight is redistributed to the
+    # other factors so that role-only queries (e.g. "find the window") can
+    # still reach the confidence threshold.  Without this, a pure-role query
+    # is capped at ~0.55 which is below the 0.88 execute threshold.
+    if not query.text:
+        text_weight = 0.0
+        role_weight = ROLE_WEIGHT + TEXT_WEIGHT * 0.50
+        source_weight = SOURCE_WEIGHT + TEXT_WEIGHT * 0.34
+        structure_weight = STRUCTURE_WEIGHT + TEXT_WEIGHT * 0.16
+    else:
+        text_weight = TEXT_WEIGHT
+        role_weight = ROLE_WEIGHT
+        source_weight = SOURCE_WEIGHT
+        structure_weight = STRUCTURE_WEIGHT
+
     score = _clamp(
-        text * TEXT_WEIGHT
-        + role * ROLE_WEIGHT
-        + source * SOURCE_WEIGHT
-        + structure * STRUCTURE_WEIGHT
+        text * text_weight
+        + role * role_weight
+        + source * source_weight
+        + structure * structure_weight
     )
     reason = (
         f"text={text:.2f};role={role:.2f};"

@@ -26,7 +26,7 @@ semantic:
     recovery_reanalysis: minimax
 
 confidence:
-  local_execute_threshold: 0.88
+  local_execute_threshold: 0.70
   local_margin_min: 0.20
   text_llm_threshold: 0.72
 

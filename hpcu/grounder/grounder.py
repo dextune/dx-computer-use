@@ -1,9 +1,13 @@
 """Grounder — resolve a query to an element id using the shared scorer."""
 
-from dataclasses import dataclass
-from typing import Optional, Sequence
+from __future__ import annotations
 
-from hpcu.router.candidate_scoring import TargetQuery, score_candidates
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, Sequence
+
+if TYPE_CHECKING:
+    from hpcu.router.candidate_scoring import TargetQuery
+
 from hpcu.runtime_config import load_runtime_config
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
@@ -63,6 +67,8 @@ class Grounder:
         )
 
     def resolve(self, target_query: dict, scene: Scene) -> GroundingResult:
+        from hpcu.router.candidate_scoring import TargetQuery, score_candidates
+
         query = TargetQuery(
             text=str(target_query.get("text") or target_query.get("name") or ""),
             role=target_query.get("role"),

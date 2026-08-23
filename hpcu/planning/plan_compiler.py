@@ -62,6 +62,7 @@ class PlanCompiler:
             nodes=nodes,
             task_budget=budget,
             compiler_version=self.compiler_version,
+            blocked_tokens=context.blocked_tokens,
         )
 
     def compile_search(

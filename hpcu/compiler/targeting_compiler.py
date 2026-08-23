@@ -150,7 +150,6 @@ class TargetingCompiler:
             payload = select_json_object(
                 response.content,
                 required_keys=_TARGETING_KEYS,
-                allowed_keys=_TARGETING_KEYS,
                 schema_name="targeting plan",
             )
         except ValueError as error:

@@ -130,6 +130,8 @@ class ControlLoop:
         """Reset task-local recovery state while preserving the live scene."""
         self._action_history.clear()
         self._scene_history.clear()
+        if self._loop_breaker is not None:
+            self._loop_breaker.reset()
 
     async def step(
         self,
@@ -148,14 +150,27 @@ class ControlLoop:
         if self._requires_target(query, action) and (
             grounding is None or not grounding.confident
         ):
-            return StepResult(
-                success=False,
-                scene=pre_scene,
-                failure_code=self._grounding_failure_code(grounding).value,
-                skipped=True,
-                grounding=grounding,
-                pre_scene_version=pre_scene.version,
-            )
+            # Navigate can fall back to the top ambiguous candidate.
+            if (
+                action.op is ActionOp.NAVIGATE
+                and grounding is not None
+                and grounding.failure_code is FailureCode.GROUNDING_AMBIGUOUS
+                and grounding.candidates
+            ):
+                grounding = GroundingResult(
+                    element_id=grounding.candidates[0].element_id,
+                    confidence=grounding.candidates[0].confidence,
+                    candidates=grounding.candidates,
+                )
+            else:
+                return StepResult(
+                    success=False,
+                    scene=pre_scene,
+                    failure_code=self._grounding_failure_code(grounding).value,
+                    skipped=True,
+                    grounding=grounding,
+                    pre_scene_version=pre_scene.version,
+                )
 
         element_id = (
             grounding.element_id if grounding is not None else action.target.element_id
@@ -428,6 +443,10 @@ class ControlLoop:
 
     @staticmethod
     def _requires_target(query: dict | None, action: Action) -> bool:
+        if action.op in _LOCAL_VERIFY_OPS:
+            return False
+        if action.op is ActionOp.FOCUS_WINDOW:
+            return False
         if query:
             return True
         return action.target.element_id is not None

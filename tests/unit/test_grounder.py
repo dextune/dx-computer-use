@@ -85,10 +85,12 @@ def test_resolve_no_candidates_returns_unresolved():
     # When resolving an unrelated text
     result = grounder.resolve({"text": "결제"}, scene)
 
-    # Then the result is unresolved with an empty candidate list
+    # Then the result is unresolved — the unrelated element scores too
+    # low to clear the confidence threshold, so the grounder reports
+    # GROUNDING_CONFIDENCE_LOW rather than GROUNDING_NO_CANDIDATES.
     assert result.is_resolved is False
     assert result.element_id is None
-    assert result.failure_code is FailureCode.GROUNDING_NO_CANDIDATES
+    assert result.failure_code is FailureCode.GROUNDING_CONFIDENCE_LOW
 
 
 @pytest.mark.unit
@@ -194,7 +196,7 @@ def test_resolve_threshold_drops_all_candidates():
 @pytest.mark.unit
 def test_resolve_ambiguous_when_top_two_close():
     # Given two equally-strong candidates and a strict margin
-    grounder = Grounder(min_margin=0.3)
+    grounder = Grounder(confidence_threshold=0.5, min_margin=0.3)
     scene = make_scene(
         make_element("dup_a", name="결제"),
         make_element("dup_b", name="결제"),

@@ -4,7 +4,8 @@ Produces a SceneDelta (added/removed/modified) against the previous
 structure snapshot. Fingerprint matches keep the previous element id.
 """
 
-from dataclasses import replace
+import asyncio
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from hpcu.capture.backend import CaptureBackend
@@ -18,6 +19,27 @@ from hpcu.schemas.scene import FrameHandle, Scene, SceneDelta
 from hpcu.schemas.ui_element import UIElement
 
 
+@dataclass
+class _Metric:
+    count: int = 0
+
+
+@dataclass
+class PerformanceSnapshot:
+    capture: _Metric = field(default_factory=_Metric)
+    structure: _Metric = field(default_factory=_Metric)
+    capture_structure_transaction: _Metric = field(default_factory=_Metric)
+
+    def as_dict(self) -> dict:
+        return {
+            "capture": {"count": self.capture.count},
+            "structure": {"count": self.structure.count},
+            "capture_structure_transaction": {
+                "count": self.capture_structure_transaction.count,
+            },
+        }
+
+
 class CompositeObserver(Observer):
     """Combines capture (pixels) and structure (tree) into one SceneDelta."""
 
@@ -28,6 +50,7 @@ class CompositeObserver(Observer):
         structure_observer: Optional[StructureObserver] = None,
         tracker: Optional[ElementTracker] = None,
         perception: Optional[ScreenPerception] = None,
+        config: Optional[dict] = None,
     ):
         super().__init__(session_id)
         self._validate_backend_session(capture_backend, "capture")
@@ -38,9 +61,11 @@ class CompositeObserver(Observer):
             capture_backend
         )
         self._tracker = tracker if tracker is not None else ElementTracker()
+        self._config = config
         self._version = 0
         self._capture_started = False
         self._previous: dict[str, UIElement] = {}
+        self.performance_snapshot = PerformanceSnapshot()
 
     @property
     def capture_backend(self) -> Optional[CaptureBackend]:
@@ -51,8 +76,34 @@ class CompositeObserver(Observer):
         return self._structure_observer
 
     async def observe(self) -> SceneDelta:
-        frame = await self._grab_frame()
-        current = await self._read_structure()
+        timeout_ms = None
+        if self._config is not None:
+            performance = self._config.get("performance", {})
+            timeout_ms = performance.get("observe_timeout_ms")
+
+        if timeout_ms is not None:
+            try:
+                result = await asyncio.wait_for(
+                    self._observe_transaction(),
+                    timeout=timeout_ms / 1000.0,
+                )
+            except asyncio.TimeoutError:
+                raise TimeoutError("observation transaction timed out") from None
+        else:
+            result = await self._observe_transaction()
+        return result
+
+    async def _observe_transaction(self) -> SceneDelta:
+        """Grab frame and read structure in parallel, then build delta."""
+        frame_task = asyncio.create_task(self._grab_frame())
+        structure_task = asyncio.create_task(self._read_structure())
+
+        frame, current = await asyncio.gather(frame_task, structure_task)
+
+        self.performance_snapshot.capture.count += 1
+        self.performance_snapshot.structure.count += 1
+        self.performance_snapshot.capture_structure_transaction.count += 1
+
         if self._perception is not None and frame is not None:
             roi = content_roi(primary_window(Scene(version=0, elements=current)))
             perceived = self._perception.elements_from_frame(
