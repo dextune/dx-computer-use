@@ -8,13 +8,17 @@ on:
     paths:
       - "hpcu/**"
       - "tests/**"
+      - "benchmarks/**"
       - "config/**"
+      - "pyproject.toml"
       - ".github/workflows/runtime-remediation.yml"
   pull_request:
     paths:
       - "hpcu/**"
       - "tests/**"
+      - "benchmarks/**"
       - "config/**"
+      - "pyproject.toml"
       - ".github/workflows/runtime-remediation.yml"
   workflow_dispatch:
 
@@ -39,31 +43,29 @@ jobs:
       - name: Install
         run: python -m pip install -e ".[dev]"
       - name: Compile all Python modules
-        run: python -m compileall -q hpcu tests
-      - name: Lint runtime remediation surface
+        run: python -m compileall -q hpcu tests benchmarks
+      - name: Lint runtime and local-resource surface
         run: >-
           python -m ruff check
           hpcu/compiler/targeting_compiler.py
-          hpcu/gateway/gateway.py
-          hpcu/grounder/grounder.py
+          hpcu/gateway
+          hpcu/observation/facade.py
+          hpcu/perception/engine.py
           hpcu/planning
-          hpcu/router/router.py
+          hpcu/runtime_config.py
           hpcu/runtime_core
-          hpcu/executor/executor.py
+          hpcu/schemas/budget.py
+          hpcu/vision/tesseract_ocr.py
           hpcu/cases
-          hpcu/schemas/plan.py
-          tests/unit/test_runtime_architecture.py
-          tests/unit/test_plan_runtime_contract.py
-          tests/unit/test_temporal_runtime.py
-          tests/unit/test_runtime_remediation.py
-          tests/unit/test_task_budget_retry.py
-          tests/unit/test_product_runtime_boundary.py
-          tests/unit/test_cases.py
-          tests/unit/test_control_loop.py
-          tests/unit/test_grounder.py
-          tests/unit/test_router.py
-          tests/unit/test_targeting.py
-          tests/unit/test_targeting_compiler_reliability.py
+          benchmarks/harness.py
+          tests/unit/test_async_gateway.py
+          tests/unit/test_async_semantic_pipeline.py
+          tests/unit/test_budget_policy.py
+          tests/unit/test_observer_concurrency.py
+          tests/unit/test_perception_runtime.py
+          tests/unit/test_performance_trace.py
+          tests/unit/test_product_runtime_resource_policy.py
+          tests/unit/test_resource_policy.py
 
   focused-contracts:
     name: 2-focused-contracts
@@ -77,23 +79,31 @@ jobs:
           cache: pip
       - name: Install
         run: python -m pip install -e ".[dev]"
-      - name: Runtime and architecture contracts
+      - name: Runtime local-resource contracts
         run: >-
           python -m pytest -q
+          tests/unit/test_async_gateway.py
+          tests/unit/test_async_semantic_pipeline.py
+          tests/unit/test_budget_policy.py
+          tests/unit/test_observer_concurrency.py
+          tests/unit/test_observer_facade.py
+          tests/unit/test_perception.py
+          tests/unit/test_perception_runtime.py
+          tests/unit/test_performance_trace.py
+          tests/unit/test_product_runtime_boundary.py
+          tests/unit/test_product_runtime_resource_policy.py
+          tests/unit/test_resource_policy.py
           tests/unit/test_runtime_architecture.py
           tests/unit/test_plan_runtime_contract.py
           tests/unit/test_temporal_runtime.py
           tests/unit/test_runtime_remediation.py
           tests/unit/test_task_budget_retry.py
-          tests/unit/test_product_runtime_boundary.py
           tests/unit/test_control_loop.py
           tests/unit/test_executor.py
           tests/unit/test_grounder.py
-          tests/unit/test_router.py
           tests/unit/test_cases.py
           tests/unit/test_targeting.py
           tests/unit/test_targeting_compiler_reliability.py
-          tests/unit/test_gateway_assembly.py
 
   integration-boundaries:
     name: 3-integration-boundaries
@@ -117,7 +127,7 @@ jobs:
   full-non-platform:
     name: 4-full-non-platform
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -141,7 +151,7 @@ jobs:
       - integration-boundaries
       - full-non-platform
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -150,17 +160,21 @@ jobs:
           cache: pip
       - name: Install
         run: python -m pip install -e ".[dev]"
-      - name: Repeat deterministic runtime contracts three times
+      - name: Repeat deterministic contracts three times
         shell: bash
         run: |
           set -euo pipefail
           for round in 1 2 3; do
             echo "deterministic round ${round}"
             python -m pytest -q \
+              tests/unit/test_budget_policy.py \
+              tests/unit/test_observer_concurrency.py \
+              tests/unit/test_perception_runtime.py \
+              tests/unit/test_performance_trace.py \
+              tests/unit/test_product_runtime_resource_policy.py \
               tests/unit/test_runtime_architecture.py \
               tests/unit/test_plan_runtime_contract.py \
               tests/unit/test_temporal_runtime.py \
               tests/unit/test_task_budget_retry.py \
-              tests/unit/test_product_runtime_boundary.py \
               tests/integration/test_command_plan_runtime.py
           done
