@@ -1,0 +1,25 @@
+"""Regression tests for multilingual blocked-token matching."""
+
+import pytest
+
+from hpcu.runtime_core.task_runtime import _blocked_token_matches
+
+pytestmark = pytest.mark.unit
+
+
+def test_ascii_blocked_token_keeps_word_boundaries():
+    assert _blocked_token_matches("bot detected", "bot") is True
+    assert _blocked_token_matches("about this page", "bot") is False
+    assert _blocked_token_matches("robot check", "bot") is False
+
+
+def test_ascii_matching_is_case_insensitive_and_whitespace_normalized():
+    assert _blocked_token_matches("CAPTCHA   detected", " captcha ") is True
+
+
+def test_korean_blocked_token_matches_attached_particle():
+    assert _blocked_token_matches("로그인이 필요합니다", "로그인") is True
+
+
+def test_korean_blocked_token_does_not_match_inside_larger_leading_word():
+    assert _blocked_token_matches("소셜로그인 옵션", "로그인") is False
