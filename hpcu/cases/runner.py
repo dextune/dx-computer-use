@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+from dataclasses import replace
 
 from hpcu.cases.specs import CaseSpec
 from hpcu.cases.stats import ActionRecord, CaseStats, EvidenceRecord
@@ -48,6 +49,7 @@ class CaseRunner:
     ) -> None:
         self._runtime = runtime
         self._capability = capability
+        self._task_budget_template = runtime.task_budget_template
         self._monotonic = monotonic if monotonic is not None else time.monotonic
 
     async def run_case(self, spec: CaseSpec) -> CaseStats:
@@ -57,10 +59,11 @@ class CaseRunner:
             outcome="running",
             max_attempts=spec.max_attempts,
         )
+        task_budget = self._case_task_budget(spec)
         request = CommandRequest(
             instruction=spec.goal,
             capability=self._capability,
-            task_budget=TaskBudgetSpec(max_model_calls=spec.max_model_calls),
+            task_budget=task_budget,
             max_steps=max(1, spec.max_attempts * 8),
             context_metadata={
                 "case_id": spec.id,
@@ -157,6 +160,26 @@ class CaseRunner:
             )
         stats.elapsed_ms = int((self._monotonic() - started) * 1000)
         return stats
+
+    def _case_task_budget(self, spec: CaseSpec) -> TaskBudgetSpec:
+        """Keep deployment resource limits while applying the case call limit.
+
+        Cases with their own low call ceiling cannot reserve a subset of that
+        same small budget for recovery without preventing plan compilation.
+        """
+        template = self._task_budget_template
+        max_calls = spec.max_model_calls
+        return replace(
+            template,
+            max_model_calls=max_calls,
+            planning_call_ceiling=min(
+                template.planning_call_ceiling
+                if template.planning_call_ceiling is not None
+                else max_calls,
+                max_calls,
+            ),
+            recovery_call_reserve=0,
+        )
 
     @staticmethod
     def _targeting_failure_code(

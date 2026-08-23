@@ -132,6 +132,11 @@ class CommandRuntime:
         self._local_repairer = local_repairer
         self._semantic_replanner_factory = semantic_replanner_factory
 
+    @property
+    def task_budget_template(self) -> TaskBudgetSpec:
+        """Return the deployment budget used when a request has no override."""
+        return effective_task_budget(self._config)
+
     async def run(self, request: CommandRequest) -> CommandRunResult:
         task_budget = effective_task_budget(self._config, request.task_budget)
         ledger = TaskBudgetLedger(task_budget)

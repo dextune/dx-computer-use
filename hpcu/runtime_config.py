@@ -16,10 +16,10 @@ _DEFAULTS: dict[str, Any] = {
         "default_provider": "minimax",
         "default_model": "MiniMax-M3",
         "request_limits": {
-            "plan_compile_max_tokens": 1024,
-            "intent_fill_max_tokens": 256,
-            "action_decision_max_tokens": 512,
-            "reanalysis_max_tokens": 512,
+            "plan_compile_max_tokens": 131072,
+            "intent_fill_max_tokens": 32768,
+            "action_decision_max_tokens": 65536,
+            "reanalysis_max_tokens": 65536,
             "intent_fill_retry_attempts": 1,
             "plan_compile_retry_attempts": 2,
             "grounding_retry_attempts": 1,
@@ -50,7 +50,7 @@ _DEFAULTS: dict[str, Any] = {
     "performance": {
         "settle_timeout_ms": 2000,
         "action_timeout_ms": 5000,
-        "model_call_timeout_ms": 30000,
+        "model_call_timeout_ms": 300000,
         "observe_timeout_ms": 5000,
         "settle_poll_interval_ms": 5,
         "settle_stable_polls": 2,
@@ -60,11 +60,11 @@ _DEFAULTS: dict[str, Any] = {
         "max_perception_queue_depth": 0,
     },
     "tier_budget": {
-        "max_model_calls_per_task": 3,
-        "max_model_tokens_per_task": 4096,
-        "max_model_latency_ms_per_task": 60000,
-        "planning_call_ceiling": 2,
-        "recovery_call_reserve": 1,
+        "max_model_calls_per_task": 12,
+        "max_model_tokens_per_task": 393216,
+        "max_model_latency_ms_per_task": 1800000,
+        "planning_call_ceiling": 4,
+        "recovery_call_reserve": 2,
         "max_vlm_calls_per_task": 3,
     },
     "recovery": {
@@ -155,13 +155,13 @@ def effective_task_budget(
     planning_raw = tier.get("planning_call_ceiling", 2)
     planning = None if planning_raw is None else int(planning_raw)
     return TaskBudgetSpec(
-        max_model_calls=int(tier.get("max_model_calls_per_task", 3)),
-        max_model_tokens=int(tier.get("max_model_tokens_per_task", 4096)),
+        max_model_calls=int(tier.get("max_model_calls_per_task", 12)),
+        max_model_tokens=int(tier.get("max_model_tokens_per_task", 393216)),
         max_model_latency_ms=int(
-            tier.get("max_model_latency_ms_per_task", 60000)
+            tier.get("max_model_latency_ms_per_task", 1800000)
         ),
         planning_call_ceiling=planning,
-        recovery_call_reserve=int(tier.get("recovery_call_reserve", 1)),
+        recovery_call_reserve=int(tier.get("recovery_call_reserve", 2)),
     )
 
 

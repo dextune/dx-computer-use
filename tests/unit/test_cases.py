@@ -13,6 +13,7 @@ from hpcu.compiler.targeting_compiler import TargetingCompilationError
 from hpcu.runtime_core.product_runtime import UnresolvedGoalError
 from hpcu.runtime_core.task_runtime import TaskRunResult, TaskStatus
 from hpcu.schemas.action import Action, ActionOp
+from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.strategy import CapabilitySnapshot
@@ -34,6 +35,14 @@ def _capability() -> CapabilitySnapshot:
 
 
 class _Runtime:
+    task_budget_template = TaskBudgetSpec(
+        max_model_calls=12,
+        max_model_tokens=393216,
+        max_model_latency_ms=1800000,
+        planning_call_ceiling=4,
+        recovery_call_reserve=2,
+    )
+
     def __init__(self, result=None, error: Exception | None = None) -> None:
         self.result = result
         self.error = error
@@ -130,6 +139,10 @@ async def test_case_runner_delegates_once_and_maps_verified_terminal_stats():
     request = runtime.requests[0]
     assert request.instruction == spec.goal
     assert request.task_budget.max_model_calls == 2
+    assert request.task_budget.max_model_tokens == 393216
+    assert request.task_budget.max_model_latency_ms == 1800000
+    assert request.task_budget.planning_call_ceiling == 2
+    assert request.task_budget.recovery_call_reserve == 0
     assert request.max_steps == 32
     assert request.context_metadata["start_url"] == spec.start_url
     assert stats.success is True
