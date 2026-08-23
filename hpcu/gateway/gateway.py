@@ -3,6 +3,9 @@
 import random
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -18,6 +21,23 @@ class ModelCallPurpose(str, Enum):
     ACTION_DECISION = "action_decision"
     POST_ACTION_REANALYSIS = "post_action_reanalysis"
     RECOVERY_REANALYSIS = "recovery_reanalysis"
+
+
+RetryAttemptHook = Callable[[ModelCallPurpose], None]
+_RETRY_ATTEMPT_HOOK: ContextVar[RetryAttemptHook | None] = ContextVar(
+    "hpcu_retry_attempt_hook",
+    default=None,
+)
+
+
+@contextmanager
+def bind_retry_attempt_hook(hook: RetryAttemptHook) -> Iterator[None]:
+    """Bind a task-local hook invoked before every provider attempt."""
+    token = _RETRY_ATTEMPT_HOOK.set(hook)
+    try:
+        yield
+    finally:
+        _RETRY_ATTEMPT_HOOK.reset(token)
 
 
 @dataclass(frozen=True)
@@ -151,7 +171,10 @@ class RetryableGateway(Gateway):
         purpose: ModelCallPurpose = ModelCallPurpose.SITUATION_ANALYSIS,
     ) -> GatewayResponse:
         last_error: Exception | None = None
+        attempt_hook = _RETRY_ATTEMPT_HOOK.get()
         for attempt in range(self._max_retries + 1):
+            if attempt_hook is not None:
+                attempt_hook(purpose)
             try:
                 return self._inner.call(
                     prompt, system_prompt, max_tokens, purpose=purpose
