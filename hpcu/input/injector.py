@@ -15,12 +15,13 @@ from hpcu.schemas.ui_element import UIElement
 
 @dataclass(frozen=True)
 class ExecutionResult:
-    """Result of an input injection attempt."""
+    """Result of an input or lifecycle execution attempt."""
 
     success: bool
-    mode: str  # "semantic" | "physical"
+    mode: str  # "semantic" | "physical" | "application"
     failure_code: str | None = None
     latency_us: int = 0
+    evidence_element_id: str | None = None
 
 
 @dataclass(frozen=True)
