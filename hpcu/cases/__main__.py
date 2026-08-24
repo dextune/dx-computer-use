@@ -20,7 +20,11 @@ from hpcu.gateway.gateway import RetryableGateway
 from hpcu.gateway.registry import create_gateway
 from hpcu.grounder.grounder import Grounder
 from hpcu.observation.facade import CompositeObserver
-from hpcu.platform.linux.sandbox import create_sandbox_backends, probe
+from hpcu.platform.linux.sandbox import (
+    create_sandbox_backends,
+    create_sandbox_launcher,
+    probe,
+)
 from hpcu.recovery.loop_breaker import LoopBreaker
 from hpcu.runtime_config import configured_semantic_identity, load_runtime_config
 from hpcu.runtime_core.control_loop import ControlLoop
@@ -157,10 +161,20 @@ def _build_gateway(runtime_config: dict) -> CountingGateway:
     return CountingGateway(transport)
 
 
-def _capability_snapshot(capture, structure, injector) -> CapabilitySnapshot:
+def _capability_snapshot(
+    capture,
+    structure,
+    injector,
+    launcher=None,
+) -> CapabilitySnapshot:
     capture_caps = capture.capabilities()
     structure_caps = structure.capabilities()
     input_caps = injector.capabilities()
+    launch_capability = (
+        launcher.capabilities().launch
+        if launcher is not None
+        else Capability.UNSUPPORTED
+    )
     physical = (
         Capability.SUPPORTED
         if input_caps.physical_pointer is Capability.SUPPORTED
@@ -177,6 +191,7 @@ def _capability_snapshot(capture, structure, injector) -> CapabilitySnapshot:
         structure=structure_caps.tree,
         semantic_input=input_caps.semantic_invoke,
         physical_input=physical,
+        application_launch=launch_capability,
         ocr=Capability.SUPPORTED,
         dirty_rects=capture_caps.dirty_rects,
     )
@@ -213,11 +228,19 @@ async def _run(args: argparse.Namespace) -> int:
         "shopping",
         base_url=args.base_url,
     )
+    launcher = create_sandbox_launcher(
+        "shopping",
+        base_url=args.base_url,
+    )
     observer = CompositeObserver("shopping", capture, structure)
     control_loop = ControlLoop(
         observer=observer,
         grounder=Grounder(config=runtime_config),
-        executor=Executor(injector, config=runtime_config),
+        executor=Executor(
+            injector,
+            config=runtime_config,
+            application_launcher=launcher,
+        ),
         verifier=Verifier(),
         loop_breaker=LoopBreaker(),
         config=runtime_config,
@@ -233,7 +256,7 @@ async def _run(args: argparse.Namespace) -> int:
     )
     runner = CaseRunner(
         runtime,
-        _capability_snapshot(capture, structure, injector),
+        _capability_snapshot(capture, structure, injector, launcher),
     )
 
     rows = []
