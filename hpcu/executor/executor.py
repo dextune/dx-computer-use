@@ -206,6 +206,7 @@ class Executor:
             )
         result = await launcher.launch(
             application,
+            candidate_id=prepared.action.target.locator,
             timeout_ms=prepared.action.timeout_ms,
             poll_interval_ms=self._poll_interval_ms,
         )
