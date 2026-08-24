@@ -186,9 +186,11 @@ class CommandRuntime:
             task_budget,
         )
         control_loop = self._control_loop_factory()
+        executor = getattr(control_loop, "executor", None)
+        launcher = getattr(executor, "application_launcher", None)
         plan = await self._application_plan_resolver.resolve(
             plan,
-            control_loop.executor.application_launcher,
+            launcher,
             gateway,
         )
         semantic_replanner = (
