@@ -30,11 +30,15 @@ class _BrowserHttp:
         default_desktop: str = "browser.desktop",
         scanned_entries: str = "",
         already_running: bool = False,
+        running_desktop: str = "",
         launch_ok: bool = True,
     ) -> None:
         self.default_desktop = default_desktop
         self.scanned_entries = scanned_entries
-        self.already_running = already_running
+        self.running_desktop = (
+            running_desktop
+            or ("browser.desktop" if already_running else "")
+        )
         self.launch_ok = launch_ok
         self.launched = False
         self.launch_calls = 0
@@ -50,7 +54,7 @@ class _BrowserHttp:
         cmd = payload.get("cmd")
         args = payload.get("args") or []
         if cmd == "xdotool" and args == ["getactivewindow"]:
-            if self.already_running:
+            if self.running_desktop:
                 return _Response({"ok": True, "stdout": "7\n", "code": 0})
             if self.launched:
                 return _Response({"ok": True, "stdout": "99\n", "code": 0})
@@ -90,8 +94,9 @@ class _BrowserHttp:
                 }
             )
         if "getwindowclassname" in script:
-            if self.already_running:
-                stdout = "7\tBrowserClass\tbrowser-bin\n"
+            if self.running_desktop:
+                stem = self.running_desktop.removesuffix(".desktop")
+                stdout = f"7\t{stem.title()}Class\t{stem}-bin\n"
             elif self.launched:
                 stem = self.launched_desktop.removesuffix(".desktop") or "browser"
                 stdout = f"99\t{stem.title()}Class\t{stem}-bin\n"
@@ -143,6 +148,24 @@ async def test_discovery_exposes_ambiguous_os_candidates_without_launching():
         "second.desktop",
     ]
     assert discovery.preferred_candidate_id is None
+    assert http.launch_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_discovery_prefers_single_observed_browser_without_model():
+    http = _BrowserHttp(
+        default_desktop="",
+        scanned_entries="first.desktop\nsecond.desktop\n",
+        running_desktop="second.desktop",
+    )
+    launcher = GrokSandboxApplicationLauncher(
+        "session",
+        client=SandboxHttpClient("http://sandbox.test", http=http),
+    )
+
+    discovery = await launcher.discover("browser")
+
+    assert discovery.preferred_candidate_id == "second.desktop"
     assert http.launch_calls == 0
 
 
