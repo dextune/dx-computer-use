@@ -11,7 +11,10 @@ Common runtime never imports X11. This plugin only uses HTTP.
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import os
+import shlex
 import struct
 import time
 from typing import Any, Optional
@@ -21,6 +24,11 @@ from hpcu.capture.backend import CaptureBackend, CaptureCapabilities
 from hpcu.capture.frame_store import FrameStore
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.input.keys import ENTER, ESCAPE, FOCUS_LOCATION, NEW_TAB, PAGE_DOWN, SELECT_ALL
+from hpcu.lifecycle.launcher import (
+    ApplicationLaunchCapabilities,
+    ApplicationLauncher,
+    ApplicationLaunchResult,
+)
 from hpcu.observation.structure_observer import StructureCapabilities, StructureObserver
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace, ScreenPoint
@@ -39,6 +47,77 @@ _PORTABLE_KEYS = {
     PAGE_DOWN: "Page_Down",
     NEW_TAB: "ctrl+t",
 }
+_DEFAULT_BROWSER_SCRIPT = r"""
+if command -v xdg-mime >/dev/null 2>&1; then
+    for mime in x-scheme-handler/http text/html; do
+        desktop=$(xdg-mime query default "$mime" 2>/dev/null || true)
+        if [ -n "$desktop" ]; then
+            printf '%s\n' "$desktop"
+            exit 0
+        fi
+    done
+fi
+exit 0
+""".strip()
+_BROWSER_ENTRY_SCAN_SCRIPT = r"""
+{
+    for dir in \
+        "${XDG_DATA_HOME:-$HOME/.local/share}/applications" \
+        "$HOME/.local/share/applications" \
+        /usr/local/share/applications \
+        /usr/share/applications
+    do
+        [ -d "$dir" ] || continue
+        for file in "$dir"/*.desktop; do
+            [ -f "$file" ] || continue
+            if grep -q '^Categories=.*WebBrowser' "$file" 2>/dev/null; then
+                basename "$file"
+            fi
+        done
+    done
+} | sort -u
+""".strip()
+_DESKTOP_ENTRY_METADATA_SCRIPT = r"""
+desktop=$1
+for dir in \
+    "${XDG_DATA_HOME:-$HOME/.local/share}/applications" \
+    "$HOME/.local/share/applications" \
+    /usr/local/share/applications \
+    /usr/share/applications
+do
+    file="$dir/$desktop"
+    [ -f "$file" ] || continue
+    wm_class=$(sed -n 's/^StartupWMClass=//p' "$file" | head -n 1)
+    exec_line=$(sed -n 's/^Exec=//p' "$file" | head -n 1)
+    printf '%s\n%s\n' "$wm_class" "$exec_line"
+    exit 0
+done
+exit 0
+""".strip()
+_WINDOW_INVENTORY_SCRIPT = r"""
+command -v xdotool >/dev/null 2>&1 || exit 0
+for window_id in $(xdotool search --onlyvisible --name . 2>/dev/null); do
+    class_name=$(xdotool getwindowclassname "$window_id" 2>/dev/null || true)
+    pid=$(xdotool getwindowpid "$window_id" 2>/dev/null || true)
+    process_name=""
+    if [ -n "$pid" ]; then
+        process_name=$(ps -p "$pid" -o comm= 2>/dev/null | head -n 1 | tr -d ' ')
+    fi
+    printf '%s\t%s\t%s\n' "$window_id" "$class_name" "$process_name"
+done
+""".strip()
+_LAUNCH_DEFAULT_BROWSER_SCRIPT = r"""
+desktop=$1
+if [ -n "$desktop" ] && command -v gtk-launch >/dev/null 2>&1; then
+    nohup gtk-launch "$desktop" about:blank >/dev/null 2>&1 &
+    exit 0
+fi
+if command -v xdg-open >/dev/null 2>&1; then
+    nohup xdg-open about:blank >/dev/null 2>&1 &
+    exit 0
+fi
+exit 127
+""".strip()
 
 
 def png_dimensions(data: bytes) -> tuple[int, int]:
@@ -52,7 +131,11 @@ def png_dimensions(data: bytes) -> tuple[int, int]:
 class SandboxHttpClient:
     """Thin HTTP wrapper; `http` is any object with get/post like httpx."""
 
-    def __init__(self, base_url: str = _DEFAULT_BASE_URL, http: Optional[Any] = None):
+    def __init__(
+        self,
+        base_url: str = _DEFAULT_BASE_URL,
+        http: Optional[Any] = None,
+    ):
         self.base_url = base_url.rstrip("/") + "/"
         self._http = http
 
@@ -165,11 +248,19 @@ class GrokSandboxInjector(InputInjector):
             if ref:
                 activated = self._client.exec("xdotool", ["windowactivate", ref])
                 self._client.exec("xdotool", ["windowraise", ref])
-                ok = bool(activated.get("ok")) or activated.get("code") in (0, "0", None)
+                ok = bool(activated.get("ok")) or activated.get("code") in (
+                    0,
+                    "0",
+                    None,
+                )
                 return ExecutionResult(
                     success=ok,
                     mode="semantic",
-                    failure_code=None if ok else FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value,
+                    failure_code=(
+                        None
+                        if ok
+                        else FailureCode.INPUT_SEMANTIC_UNSUPPORTED.value
+                    ),
                 )
         return ExecutionResult(
             success=False,
@@ -178,39 +269,63 @@ class GrokSandboxInjector(InputInjector):
         )
 
     async def physical(
-        self, point: ScreenPoint, action: str, text: str | None = None
+        self,
+        point: ScreenPoint,
+        action: str,
+        text: str | None = None,
     ) -> ExecutionResult:
         x = int(round(point.x))
         y = int(round(point.y))
         if action in ("click", "invoke"):
             result = self._client.exec(
-                "xdotool", ["mousemove", str(x), str(y), "click", "1"]
+                "xdotool",
+                ["mousemove", str(x), str(y), "click", "1"],
             )
         elif action in ("double_click",):
             result = self._client.exec(
-                "xdotool", ["mousemove", str(x), str(y), "click", "--repeat", "2", "1"]
+                "xdotool",
+                [
+                    "mousemove",
+                    str(x),
+                    str(y),
+                    "click",
+                    "--repeat",
+                    "2",
+                    "1",
+                ],
             )
         elif action in ("right_click",):
             result = self._client.exec(
-                "xdotool", ["mousemove", str(x), str(y), "click", "3"]
+                "xdotool",
+                ["mousemove", str(x), str(y), "click", "3"],
             )
         elif action in ("type", "replace_text"):
             result = self._client.exec(
                 "xdotool",
-                ["type", "--delay", "0", "--clearmodifiers", "--", text or ""],
+                [
+                    "type",
+                    "--delay",
+                    "0",
+                    "--clearmodifiers",
+                    "--",
+                    text or "",
+                ],
             )
         elif action in ("key", "hotkey"):
             mapped = _PORTABLE_KEYS.get(text or ENTER, text or "Return")
             result = self._client.exec("xdotool", ["key", mapped])
         else:
             result = self._client.exec(
-                "xdotool", ["mousemove", str(x), str(y)]
+                "xdotool",
+                ["mousemove", str(x), str(y)],
             )
         ok = bool(result.get("ok")) or result.get("code") in (0, "0", None)
         return ExecutionResult(
             success=ok,
             mode="physical",
-            failure_code=None if ok else FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value,
+            failure_code=(
+                None if ok else FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value
+            ),
         )
 
     def capabilities(self) -> InputCapabilities:
@@ -219,6 +334,241 @@ class GrokSandboxInjector(InputInjector):
             physical_pointer=Capability.SUPPORTED,
             physical_keyboard=Capability.SUPPORTED,
         )
+
+
+class GrokSandboxApplicationLauncher(ApplicationLauncher):
+    """Discover and launch the Linux default browser without app-name tables."""
+
+    def __init__(
+        self,
+        session_id: str,
+        *,
+        client: Optional[SandboxHttpClient] = None,
+        sleep=None,
+        monotonic=None,
+    ) -> None:
+        super().__init__(session_id)
+        self._client = client or SandboxHttpClient()
+        self._sleep = sleep if sleep is not None else asyncio.sleep
+        self._monotonic = monotonic if monotonic is not None else time.monotonic
+
+    async def launch(
+        self,
+        application: str,
+        *,
+        timeout_ms: int,
+        poll_interval_ms: int,
+    ) -> ApplicationLaunchResult:
+        if application.strip().casefold() != "browser":
+            return ApplicationLaunchResult(
+                success=False,
+                application=application,
+                failure_code=FailureCode.APPLICATION_LAUNCH_UNSUPPORTED.value,
+            )
+
+        desktop_id, failure = self._discover_browser_desktop_id()
+        if failure is not None:
+            return ApplicationLaunchResult(
+                success=False,
+                application=application,
+                failure_code=failure.value,
+            )
+        startup_class, executable = self._desktop_metadata(desktop_id)
+        baseline = self._window_inventory()
+        baseline_ids = {window_id for window_id, _, _ in baseline}
+        matching = self._matching_windows(
+            baseline,
+            startup_class=startup_class,
+            executable=executable,
+        )
+        active = self._active_window()
+        existing = self._choose_window(matching, active)
+        if existing is not None:
+            return self._success(application, existing)
+
+        launched = self._client.exec(
+            "sh",
+            ["-c", _LAUNCH_DEFAULT_BROWSER_SCRIPT, "hpcu-launch", desktop_id],
+            timeout_ms=min(max(timeout_ms, 1), 10_000),
+        )
+        if not self._exec_ok(launched):
+            return ApplicationLaunchResult(
+                success=False,
+                application=application,
+                failure_code=FailureCode.APPLICATION_LAUNCH_FAILED.value,
+            )
+
+        deadline = self._monotonic() + max(timeout_ms, 1) / 1000.0
+        interval = max(poll_interval_ms, 1) / 1000.0
+        while True:
+            inventory = self._window_inventory()
+            matching = self._matching_windows(
+                inventory,
+                startup_class=startup_class,
+                executable=executable,
+            )
+            active = self._active_window()
+            chosen = self._choose_window(matching, active)
+            if chosen is None:
+                new_ids = [
+                    window_id
+                    for window_id, _, _ in inventory
+                    if window_id not in baseline_ids
+                ]
+                if active in new_ids:
+                    chosen = active
+                elif len(new_ids) == 1:
+                    chosen = new_ids[0]
+            if chosen is not None:
+                return self._success(application, chosen)
+            if self._monotonic() >= deadline:
+                return ApplicationLaunchResult(
+                    success=False,
+                    application=application,
+                    failure_code=FailureCode.APPLICATION_NOT_OBSERVED.value,
+                )
+            await self._sleep(interval)
+
+    def capabilities(self) -> ApplicationLaunchCapabilities:
+        return ApplicationLaunchCapabilities(
+            launch=Capability.SUPPORTED,
+            discovery=Capability.SUPPORTED,
+        )
+
+    def _discover_browser_desktop_id(
+        self,
+    ) -> tuple[str, FailureCode | None]:
+        default = self._client.exec("sh", ["-c", _DEFAULT_BROWSER_SCRIPT])
+        if self._exec_ok(default):
+            desktop_id = self._first_line(default.get("stdout", ""))
+            if desktop_id:
+                return desktop_id, None
+
+        scanned = self._client.exec("sh", ["-c", _BROWSER_ENTRY_SCAN_SCRIPT])
+        if not self._exec_ok(scanned):
+            return "", FailureCode.APPLICATION_NOT_FOUND
+        entries = tuple(
+            dict.fromkeys(
+                line.strip()
+                for line in str(scanned.get("stdout", "")).splitlines()
+                if line.strip()
+            )
+        )
+        if len(entries) == 1:
+            return entries[0], None
+        if len(entries) > 1:
+            return "", FailureCode.DECISION_REQUIRED
+        return "", FailureCode.APPLICATION_NOT_FOUND
+
+    def _desktop_metadata(self, desktop_id: str) -> tuple[str, str]:
+        result = self._client.exec(
+            "sh",
+            [
+                "-c",
+                _DESKTOP_ENTRY_METADATA_SCRIPT,
+                "hpcu-desktop-entry",
+                desktop_id,
+            ],
+        )
+        if not self._exec_ok(result):
+            return "", ""
+        lines = str(result.get("stdout", "")).splitlines()
+        startup_class = lines[0].strip() if lines else ""
+        exec_line = lines[1].strip() if len(lines) > 1 else ""
+        return startup_class, self._executable_name(exec_line)
+
+    def _window_inventory(self) -> tuple[tuple[str, str, str], ...]:
+        result = self._client.exec("sh", ["-c", _WINDOW_INVENTORY_SCRIPT])
+        if not self._exec_ok(result):
+            return ()
+        windows: list[tuple[str, str, str]] = []
+        for line in str(result.get("stdout", "")).splitlines():
+            parts = line.split("\t")
+            if not parts or not parts[0].strip():
+                continue
+            window_id = parts[0].strip()
+            class_name = parts[1].strip() if len(parts) > 1 else ""
+            process_name = parts[2].strip() if len(parts) > 2 else ""
+            windows.append((window_id, class_name, process_name))
+        return tuple(windows)
+
+    def _active_window(self) -> str:
+        result = self._client.exec("xdotool", ["getactivewindow"])
+        if not self._exec_ok(result):
+            return ""
+        return self._first_line(result.get("stdout", ""))
+
+    @staticmethod
+    def _matching_windows(
+        inventory: tuple[tuple[str, str, str], ...],
+        *,
+        startup_class: str,
+        executable: str,
+    ) -> tuple[str, ...]:
+        needles = tuple(
+            value.casefold()
+            for value in (startup_class.strip(), executable.strip())
+            if value.strip()
+        )
+        if not needles:
+            return ()
+        matches = []
+        for window_id, class_name, process_name in inventory:
+            haystacks = (class_name.casefold(), process_name.casefold())
+            if any(
+                needle == haystack or needle in haystack
+                for needle in needles
+                for haystack in haystacks
+                if haystack
+            ):
+                matches.append(window_id)
+        return tuple(matches)
+
+    @staticmethod
+    def _choose_window(candidates: tuple[str, ...], active: str) -> str | None:
+        if active and active in candidates:
+            return active
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
+    @staticmethod
+    def _success(application: str, window_id: str) -> ApplicationLaunchResult:
+        return ApplicationLaunchResult(
+            success=True,
+            application=application,
+            evidence_element_id=f"x11:{window_id}",
+        )
+
+    @staticmethod
+    def _first_line(value: object) -> str:
+        for line in str(value or "").splitlines():
+            if line.strip():
+                return line.strip()
+        return ""
+
+    @staticmethod
+    def _executable_name(exec_line: str) -> str:
+        if not exec_line.strip():
+            return ""
+        try:
+            parts = shlex.split(exec_line)
+        except ValueError:
+            return ""
+        if not parts:
+            return ""
+        index = 0
+        if os.path.basename(parts[0]) == "env":
+            index = 1
+            while index < len(parts) and "=" in parts[index]:
+                index += 1
+        if index >= len(parts):
+            return ""
+        return os.path.basename(parts[index])
+
+    @staticmethod
+    def _exec_ok(result: dict) -> bool:
+        return bool(result.get("ok")) or result.get("code") in (0, "0", None)
 
 
 class GrokSandboxStructure(StructureObserver):
@@ -243,11 +593,18 @@ class GrokSandboxStructure(StructureObserver):
         )
         if not listing.get("ok"):
             return ()
-        window_ids = [line.strip() for line in listing.get("stdout", "").splitlines() if line.strip()]
+        window_ids = [
+            line.strip()
+            for line in listing.get("stdout", "").splitlines()
+            if line.strip()
+        ]
         elements: list[UIElement] = []
         for window_id in window_ids:
             name_result = self._client.exec("xdotool", ["getwindowname", window_id])
-            geo_result = self._client.exec("xdotool", ["getwindowgeometry", window_id])
+            geo_result = self._client.exec(
+                "xdotool",
+                ["getwindowgeometry", window_id],
+            )
             name = (name_result.get("stdout") or "").strip() or window_id
             bbox = _parse_geometry(geo_result.get("stdout") or "")
             elements.append(
@@ -258,7 +615,13 @@ class GrokSandboxStructure(StructureObserver):
                     name=name,
                     text=name,
                     bbox=bbox,
-                    sources=(ElementSource(type="atspi", ref=window_id, confidence=0.7),),
+                    sources=(
+                        ElementSource(
+                            type="atspi",
+                            ref=window_id,
+                            confidence=0.7,
+                        ),
+                    ),
                 )
             )
         return tuple(elements)
@@ -306,3 +669,16 @@ def create_sandbox_backends(
     structure = GrokSandboxStructure(session_id, client=client)
     injector = GrokSandboxInjector(session_id, client=client)
     return capture, structure, injector
+
+
+def create_sandbox_launcher(
+    session_id: str,
+    *,
+    base_url: str = _DEFAULT_BASE_URL,
+    http: Optional[Any] = None,
+) -> GrokSandboxApplicationLauncher:
+    """Create an application launcher bound to the same sandbox session."""
+    return GrokSandboxApplicationLauncher(
+        session_id,
+        client=SandboxHttpClient(base_url, http=http),
+    )
