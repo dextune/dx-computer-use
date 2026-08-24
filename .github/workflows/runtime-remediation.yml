@@ -66,6 +66,7 @@ jobs:
           hpcu/vision/tesseract_ocr.py
           hpcu/cases
           benchmarks/harness.py
+          tests/integration/test_browser_bootstrap_runtime.py
           tests/unit/test_application_plan_resolver.py
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
@@ -198,5 +199,6 @@ jobs:
               tests/unit/test_plan_runtime_contract.py \
               tests/unit/test_temporal_runtime.py \
               tests/unit/test_task_budget_retry.py \
+              tests/integration/test_browser_bootstrap_runtime.py \
               tests/integration/test_command_plan_runtime.py
           done
