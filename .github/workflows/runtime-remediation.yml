@@ -10,6 +10,7 @@ on:
       - "tests/**"
       - "benchmarks/**"
       - "config/**"
+      - "schemas/**"
       - "pyproject.toml"
       - ".github/workflows/runtime-remediation.yml"
   pull_request:
@@ -18,6 +19,7 @@ on:
       - "tests/**"
       - "benchmarks/**"
       - "config/**"
+      - "schemas/**"
       - "pyproject.toml"
       - ".github/workflows/runtime-remediation.yml"
   workflow_dispatch:
@@ -50,19 +52,26 @@ jobs:
           hpcu/capture/frame_store.py
           hpcu/compiler/targeting_compiler.py
           hpcu/gateway
+          hpcu/lifecycle
           hpcu/observation/facade.py
           hpcu/perception/engine.py
           hpcu/planning
+          hpcu/platform/linux/sandbox.py
           hpcu/runtime_config.py
           hpcu/runtime_core
+          hpcu/schemas/action.py
           hpcu/schemas/budget.py
+          hpcu/schemas/failure_codes.py
+          hpcu/schemas/strategy.py
           hpcu/vision/tesseract_ocr.py
           hpcu/cases
           benchmarks/harness.py
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
+          tests/unit/test_browser_bootstrap.py
           tests/unit/test_budget_policy.py
           tests/unit/test_frame_store.py
+          tests/unit/test_linux_browser_launcher.py
           tests/unit/test_observer_concurrency.py
           tests/unit/test_perception_runtime.py
           tests/unit/test_performance_trace.py
@@ -87,8 +96,11 @@ jobs:
           python -m pytest -q
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
+          tests/unit/test_browser_bootstrap.py
           tests/unit/test_budget_policy.py
           tests/unit/test_frame_store.py
+          tests/unit/test_linux_browser_launcher.py
+          tests/unit/test_linux_sandbox.py
           tests/unit/test_observer_concurrency.py
           tests/unit/test_observer_facade.py
           tests/unit/test_perception.py
@@ -171,8 +183,10 @@ jobs:
           for round in 1 2 3; do
             echo "deterministic round ${round}"
             python -m pytest -q \
+              tests/unit/test_browser_bootstrap.py \
               tests/unit/test_budget_policy.py \
               tests/unit/test_frame_store.py \
+              tests/unit/test_linux_browser_launcher.py \
               tests/unit/test_observer_concurrency.py \
               tests/unit/test_perception_runtime.py \
               tests/unit/test_performance_trace.py \
