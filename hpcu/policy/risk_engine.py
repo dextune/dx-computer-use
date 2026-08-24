@@ -10,9 +10,10 @@ from hpcu.schemas.action import Action, ActionOp
 from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
-# Ops that never mutate anything and are therefore always LOW risk.
+# Ops that never mutate durable user data and are therefore LOW risk.
 LOW_RISK_OPS = frozenset(
     {
+        ActionOp.LAUNCH_APPLICATION,
         ActionOp.FOCUS_WINDOW,
         ActionOp.NAVIGATE,
         ActionOp.ASSERT,
