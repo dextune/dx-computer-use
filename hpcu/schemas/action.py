@@ -101,3 +101,4 @@ class Action:
     modifiers: tuple[str, ...] = ()  # for hotkey
     dx: float = 0.0  # for scroll/drag
     dy: float = 0.0
+    application_candidate_id: Optional[str] = None
