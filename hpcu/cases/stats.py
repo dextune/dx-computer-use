@@ -94,7 +94,6 @@ class CaseStats:
     model_error_count: int = 0
     model_tokens: int = 0
     compile_call_count: int = 0
-    application_selection_call_count: int = 0
     grounding_call_count: int = 0
     provider: str = DEFAULT_PROVIDER_ID
     model: str = DEFAULT_MODEL_ID
@@ -114,6 +113,7 @@ class CaseStats:
     attempts_detail: list[AttemptRecord] = field(default_factory=list)
     artifact_manifest: list[str] = field(default_factory=list)
     decision_diagnostics: list[str] = field(default_factory=list)
+    application_selection_call_count: int = 0
 
 
 class CountingGateway(Gateway):
