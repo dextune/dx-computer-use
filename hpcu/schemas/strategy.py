@@ -18,6 +18,7 @@ class CapabilitySnapshot:
     structure: Capability = Capability.UNSUPPORTED
     semantic_input: Capability = Capability.UNSUPPORTED
     physical_input: Capability = Capability.UNSUPPORTED
+    application_launch: Capability = Capability.UNSUPPORTED
     ocr: Capability = Capability.UNSUPPORTED
     dirty_rects: Capability = Capability.UNSUPPORTED
     tool_actions: tuple[str, ...] = ()
