@@ -204,12 +204,19 @@ class Executor:
                 mode="application",
                 failure_code=FailureCode.APPLICATION_LAUNCH_UNSUPPORTED.value,
             )
-        result = await launcher.launch(
-            application,
-            candidate_id=prepared.action.target.locator,
-            timeout_ms=prepared.action.timeout_ms,
-            poll_interval_ms=self._poll_interval_ms,
-        )
+        try:
+            result = await launcher.launch(
+                application,
+                candidate_id=prepared.action.target.locator,
+                timeout_ms=prepared.action.timeout_ms,
+                poll_interval_ms=self._poll_interval_ms,
+            )
+        except Exception:
+            return ExecutionResult(
+                success=False,
+                mode="application",
+                failure_code=FailureCode.APPLICATION_LAUNCH_FAILED.value,
+            )
         return ExecutionResult(
             success=result.success,
             mode="application",
