@@ -11,7 +11,7 @@ from hpcu.gateway.json_response import select_json_object
 from hpcu.lifecycle.launcher import ApplicationCandidate, ApplicationLauncher
 from hpcu.runtime_config import semantic_call_timeout_ms
 from hpcu.schemas.action import ActionOp, ActionTarget
-from hpcu.schemas.plan import PlanIR, PlanNode
+from hpcu.schemas.plan import PlanIR
 
 
 class ApplicationPlanResolver:
@@ -83,17 +83,22 @@ class ApplicationPlanResolver:
         max_tokens = int(limits.get("application_selection_max_tokens", 256))
         if max_tokens <= 0:
             return None
-        response = await call_gateway_async(
-            gateway,
-            self._prompt(plan, application, candidates),
-            system_prompt=(
-                "Select one OS-discovered application candidate only when it "
-                "matches the requested logical application. Never invent an ID."
-            ),
-            max_tokens=max_tokens,
-            purpose=ModelCallPurpose.APPLICATION_SELECTION,
-            timeout_ms=semantic_call_timeout_ms(self._config),
-        )
+        try:
+            response = await call_gateway_async(
+                gateway,
+                self._prompt(plan, application, candidates),
+                system_prompt=(
+                    "Select one OS-discovered application candidate only when it "
+                    "matches the requested logical application. Never invent an ID."
+                ),
+                max_tokens=max_tokens,
+                purpose=ModelCallPurpose.APPLICATION_SELECTION,
+                timeout_ms=semantic_call_timeout_ms(self._config),
+            )
+        except Exception:
+            # Semantic selection is optional. Leaving the locator unresolved makes
+            # the platform launcher return DECISION_REQUIRED before side effects.
+            return None
         try:
             payload = select_json_object(
                 response.content,
