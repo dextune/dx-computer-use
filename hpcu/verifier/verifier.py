@@ -14,6 +14,7 @@ from hpcu.schemas.scene import Scene
 from hpcu.schemas.ui_element import UIElement
 
 _INT_PATTERN = re.compile(r"(\d+)")
+_IDEMPOTENT_STATE_OPS = frozenset({ActionOp.LAUNCH_APPLICATION})
 _SIDE_EFFECT_OPS = frozenset(
     {
         ActionOp.FOCUS_WINDOW,
@@ -84,13 +85,17 @@ class Verifier:
         return all(self._check_postcondition(cond, scene) for cond in postconditions)
 
     def verify_transition(self, action: Action, before: Scene, after: Scene) -> bool:
-        """Prove a side-effect using a fresh post-action scene.
+        """Prove an action from fresh post-action scene evidence.
 
         Mutating actions require explicit postconditions that were false before
-        execution and true afterward.  This deliberately rejects weak proofs
-        such as "the button I clicked is visible", which were already true in
-        the pre-action scene and therefore cannot establish the click's effect.
+        execution and true afterward. Idempotent desired-state actions such as
+        application launch may already be satisfied before execution, so they
+        require a fresh post-action observation without the false-before rule.
         """
+        if action.op in _IDEMPOTENT_STATE_OPS:
+            return bool(action.postconditions) and self.verify_postconditions(
+                action.postconditions, after
+            )
         if action.op not in _SIDE_EFFECT_OPS:
             return self.verify_postconditions(action.postconditions, after)
         if not action.postconditions:
