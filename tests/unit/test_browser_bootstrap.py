@@ -98,6 +98,19 @@ class _Launcher(ApplicationLauncher):
         )
 
 
+class _ExplodingLauncher(_Launcher):
+    async def launch(
+        self,
+        application: str,
+        *,
+        candidate_id: str | None = None,
+        timeout_ms: int,
+        poll_interval_ms: int,
+    ) -> ApplicationLaunchResult:
+        del application, candidate_id, timeout_ms, poll_interval_ms
+        raise RuntimeError("launcher backend failed")
+
+
 class _LaunchObserver(Observer):
     def __init__(self) -> None:
         super().__init__("session")
@@ -253,6 +266,22 @@ async def test_executor_reports_missing_launcher_explicitly():
 
     assert result.success is False
     assert result.failure_code == FailureCode.APPLICATION_LAUNCH_UNSUPPORTED.value
+
+
+@pytest.mark.asyncio
+async def test_launcher_backend_exception_is_contained_explicitly():
+    injector = _NoInput()
+    executor = Executor(
+        injector,
+        application_launcher=_ExplodingLauncher(),
+    )
+    prepared = executor.prepare(_launch_action(), None)
+
+    result = await executor.execute(prepared)
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.APPLICATION_LAUNCH_FAILED.value
+    assert injector.calls == 0
 
 
 def test_case_plan_launches_browser_before_entry_navigation():
