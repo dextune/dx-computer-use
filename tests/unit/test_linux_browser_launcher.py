@@ -38,6 +38,7 @@ class _BrowserHttp:
         self.launch_ok = launch_ok
         self.launched = False
         self.launch_calls = 0
+        self.launched_desktop = ""
 
     def get(self, url: str):
         del url
@@ -75,10 +76,16 @@ class _BrowserHttp:
                 {"ok": True, "stdout": self.scanned_entries, "code": 0}
             )
         if "StartupWMClass" in script:
+            desktop_id = args[-1] if args else "browser.desktop"
+            stem = str(desktop_id).removesuffix(".desktop")
             return _Response(
                 {
                     "ok": True,
-                    "stdout": "BrowserClass\n/usr/bin/browser-bin %U\n",
+                    "stdout": (
+                        f"{stem.title()}\n"
+                        f"{stem.title()}Class\n"
+                        f"/usr/bin/{stem}-bin %U\n"
+                    ),
                     "code": 0,
                 }
             )
@@ -86,17 +93,57 @@ class _BrowserHttp:
             if self.already_running:
                 stdout = "7\tBrowserClass\tbrowser-bin\n"
             elif self.launched:
-                stdout = "99\tBrowserClass\tbrowser-bin\n"
+                stem = self.launched_desktop.removesuffix(".desktop") or "browser"
+                stdout = f"99\t{stem.title()}Class\t{stem}-bin\n"
             else:
                 stdout = ""
             return _Response({"ok": True, "stdout": stdout, "code": 0})
         if "gtk-launch" in script:
             self.launch_calls += 1
+            self.launched_desktop = str(args[-1]) if args else ""
             if not self.launch_ok:
                 return _Response({"ok": False, "stdout": ""})
             self.launched = True
             return _Response({"ok": True, "stdout": "", "code": 0})
         return _Response({"ok": True, "stdout": "", "code": 0})
+
+
+@pytest.mark.asyncio
+async def test_discovery_prefers_os_default_without_semantic_choice():
+    http = _BrowserHttp(default_desktop="browser.desktop")
+    launcher = GrokSandboxApplicationLauncher(
+        "session",
+        client=SandboxHttpClient("http://sandbox.test", http=http),
+    )
+
+    discovery = await launcher.discover("browser")
+
+    assert [candidate.id for candidate in discovery.candidates] == [
+        "browser.desktop"
+    ]
+    assert discovery.preferred_candidate_id == "browser.desktop"
+    assert discovery.candidates[0].label == "Browser"
+
+
+@pytest.mark.asyncio
+async def test_discovery_exposes_ambiguous_os_candidates_without_launching():
+    http = _BrowserHttp(
+        default_desktop="",
+        scanned_entries="first.desktop\nsecond.desktop\n",
+    )
+    launcher = GrokSandboxApplicationLauncher(
+        "session",
+        client=SandboxHttpClient("http://sandbox.test", http=http),
+    )
+
+    discovery = await launcher.discover("browser")
+
+    assert [candidate.id for candidate in discovery.candidates] == [
+        "first.desktop",
+        "second.desktop",
+    ]
+    assert discovery.preferred_candidate_id is None
+    assert http.launch_calls == 0
 
 
 @pytest.mark.asyncio
@@ -116,6 +163,7 @@ async def test_launcher_discovers_default_browser_and_returns_window_evidence():
     assert result.success is True
     assert result.evidence_element_id == "x11:99"
     assert http.launch_calls == 1
+    assert http.launched_desktop == "browser.desktop"
     assert launcher.capabilities().launch is Capability.SUPPORTED
 
 
@@ -158,6 +206,30 @@ async def test_launcher_fails_closed_when_browser_discovery_is_ambiguous():
     assert result.success is False
     assert result.failure_code == FailureCode.DECISION_REQUIRED.value
     assert http.launch_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_launcher_executes_only_explicit_bound_candidate():
+    http = _BrowserHttp(
+        default_desktop="",
+        scanned_entries="first.desktop\nsecond.desktop\n",
+    )
+    launcher = GrokSandboxApplicationLauncher(
+        "session",
+        client=SandboxHttpClient("http://sandbox.test", http=http),
+    )
+
+    result = await launcher.launch(
+        "browser",
+        candidate_id="second.desktop",
+        timeout_ms=100,
+        poll_interval_ms=1,
+    )
+
+    assert result.success is True
+    assert result.evidence_element_id == "x11:99"
+    assert http.launch_calls == 1
+    assert http.launched_desktop == "second.desktop"
 
 
 @pytest.mark.asyncio
