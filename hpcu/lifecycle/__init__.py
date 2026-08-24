@@ -7,6 +7,7 @@ from hpcu.lifecycle.launcher import (
     ApplicationLauncher,
     ApplicationLaunchResult,
 )
+from hpcu.lifecycle.resolver import ApplicationPlanResolver
 
 __all__ = [
     "ApplicationCandidate",
@@ -14,4 +15,5 @@ __all__ = [
     "ApplicationLaunchCapabilities",
     "ApplicationLauncher",
     "ApplicationLaunchResult",
+    "ApplicationPlanResolver",
 ]
