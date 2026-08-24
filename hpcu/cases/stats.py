@@ -94,6 +94,7 @@ class CaseStats:
     model_error_count: int = 0
     model_tokens: int = 0
     compile_call_count: int = 0
+    application_selection_call_count: int = 0
     grounding_call_count: int = 0
     provider: str = DEFAULT_PROVIDER_ID
     model: str = DEFAULT_MODEL_ID
@@ -233,6 +234,9 @@ def aggregate(rows: list[CaseStats]) -> dict[str, Any]:
             "model_error_count": sum(row.model_error_count for row in rows),
             "model_tokens": sum(row.model_tokens for row in rows),
             "compile_call_count": sum(row.compile_call_count for row in rows),
+            "application_selection_call_count": sum(
+                row.application_selection_call_count for row in rows
+            ),
             "grounding_call_count": sum(row.grounding_call_count for row in rows),
             "purpose_call_counts": purpose_totals,
         },
