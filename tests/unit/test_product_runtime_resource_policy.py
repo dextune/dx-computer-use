@@ -48,6 +48,7 @@ def _config() -> dict:
             "request_limits": {
                 "intent_fill_retry_attempts": 0,
                 "plan_compile_retry_attempts": 1,
+                "application_selection_retry_attempts": 5,
                 "grounding_retry_attempts": 2,
                 "action_decision_retry_attempts": 3,
                 "reanalysis_retry_attempts": 4,
@@ -104,6 +105,7 @@ def test_existing_retry_wrapper_receives_purpose_policy():
     assert retry_layer is retrying
     assert retry_layer.retry_limit(ModelCallPurpose.INTENT_FILL) == 0
     assert retry_layer.retry_limit(ModelCallPurpose.PLAN_COMPILE) == 1
+    assert retry_layer.retry_limit(ModelCallPurpose.APPLICATION_SELECTION) == 5
     assert retry_layer.retry_limit(ModelCallPurpose.GROUNDING) == 2
     assert retry_layer.retry_limit(ModelCallPurpose.ACTION_DECISION) == 3
     assert retry_layer.retry_limit(ModelCallPurpose.RECOVERY_REANALYSIS) == 4
