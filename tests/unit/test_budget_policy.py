@@ -83,6 +83,20 @@ def test_planning_ceiling_and_recovery_reserve_are_enforced():
     assert ledger.model_calls == 3
 
 
+def test_application_selection_counts_against_planning_ceiling():
+    ledger = TaskBudgetLedger(
+        TaskBudgetSpec(
+            max_model_calls=3,
+            planning_call_ceiling=2,
+        )
+    )
+    ledger.before_call(ModelCallPurpose.INTENT_FILL)
+    ledger.before_call(ModelCallPurpose.APPLICATION_SELECTION)
+
+    with pytest.raises(ModelBudgetExceeded, match="planning"):
+        ledger.before_call(ModelCallPurpose.PLAN_COMPILE)
+
+
 def test_planning_ceiling_counts_real_attempts():
     ledger = TaskBudgetLedger(
         TaskBudgetSpec(
@@ -102,6 +116,7 @@ def test_retry_policy_maps_each_purpose_independently():
                 "request_limits": {
                     "intent_fill_retry_attempts": 0,
                     "plan_compile_retry_attempts": 1,
+                    "application_selection_retry_attempts": 5,
                     "grounding_retry_attempts": 2,
                     "action_decision_retry_attempts": 3,
                     "reanalysis_retry_attempts": 4,
@@ -112,6 +127,7 @@ def test_retry_policy_maps_each_purpose_independently():
 
     assert policy[ModelCallPurpose.INTENT_FILL] == 0
     assert policy[ModelCallPurpose.PLAN_COMPILE] == 1
+    assert policy[ModelCallPurpose.APPLICATION_SELECTION] == 5
     assert policy[ModelCallPurpose.GROUNDING] == 2
     assert policy[ModelCallPurpose.ACTION_DECISION] == 3
     assert policy[ModelCallPurpose.RECOVERY_REANALYSIS] == 4
