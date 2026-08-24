@@ -29,6 +29,7 @@ _LOCAL_ONLY_OPS = frozenset(
     }
 )
 _PLAN_COMPILE_PURPOSE = "plan_compile"
+_APPLICATION_SELECTION_PURPOSE = "application_selection"
 _GROUNDING_PURPOSES = ("grounding", "action_decision")
 _REANALYSIS_PURPOSES = ("post_action_reanalysis", "recovery_reanalysis")
 
@@ -112,6 +113,10 @@ class CaseRunner:
         stats.model_call_count = result.model_calls
         stats.model_tokens = result.model_tokens
         stats.compile_call_count = purpose_counts.get(_PLAN_COMPILE_PURPOSE, 0)
+        stats.application_selection_call_count = purpose_counts.get(
+            _APPLICATION_SELECTION_PURPOSE,
+            0,
+        )
         stats.grounding_call_count = sum(
             purpose_counts.get(purpose, 0) for purpose in _GROUNDING_PURPOSES
         )
