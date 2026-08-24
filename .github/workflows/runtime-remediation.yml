@@ -66,6 +66,7 @@ jobs:
           hpcu/vision/tesseract_ocr.py
           hpcu/cases
           benchmarks/harness.py
+          tests/unit/test_application_plan_resolver.py
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_browser_bootstrap.py
@@ -94,6 +95,7 @@ jobs:
       - name: Runtime local-resource contracts
         run: >-
           python -m pytest -q
+          tests/unit/test_application_plan_resolver.py
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_browser_bootstrap.py
@@ -183,6 +185,7 @@ jobs:
           for round in 1 2 3; do
             echo "deterministic round ${round}"
             python -m pytest -q \
+              tests/unit/test_application_plan_resolver.py \
               tests/unit/test_browser_bootstrap.py \
               tests/unit/test_budget_policy.py \
               tests/unit/test_frame_store.py \
