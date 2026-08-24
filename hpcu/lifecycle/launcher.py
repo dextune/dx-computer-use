@@ -15,6 +15,38 @@ class ApplicationLaunchCapabilities:
 
 
 @dataclass(frozen=True)
+class ApplicationCandidate:
+    """OS-discovered application candidate safe to expose to planning."""
+
+    id: str
+    label: str
+    window_class: str = ""
+    executable: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.id.strip() or not self.label.strip():
+            raise ValueError("application candidate id and label are required")
+
+
+@dataclass(frozen=True)
+class ApplicationDiscoveryResult:
+    """Local discovery result before any application side effect occurs."""
+
+    application: str
+    candidates: tuple[ApplicationCandidate, ...] = ()
+    preferred_candidate_id: str | None = None
+    failure_code: str | None = None
+
+    def __post_init__(self) -> None:
+        ids = tuple(candidate.id for candidate in self.candidates)
+        if len(ids) != len(set(ids)):
+            raise ValueError("application candidate ids must be unique")
+        preferred = self.preferred_candidate_id
+        if preferred is not None and preferred not in ids:
+            raise ValueError("preferred application candidate must be discovered")
+
+
+@dataclass(frozen=True)
 class ApplicationLaunchResult:
     """Result of ensuring a logical application is running and observable."""
 
@@ -35,10 +67,16 @@ class ApplicationLauncher(ABC):
         return self._session_id
 
     @abstractmethod
+    async def discover(self, application: str) -> ApplicationDiscoveryResult:
+        """Return local candidates without launching or focusing an application."""
+        ...
+
+    @abstractmethod
     async def launch(
         self,
         application: str,
         *,
+        candidate_id: str | None = None,
         timeout_ms: int,
         poll_interval_ms: int,
     ) -> ApplicationLaunchResult:
