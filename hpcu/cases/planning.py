@@ -44,7 +44,7 @@ _INTERACTION_OPS = frozenset(
 
 
 class CasePlanCompiler(PlanCompiler):
-    """Prepend data-defined browser entry to the common intent plan."""
+    """Prepend browser lifecycle and data-defined entry to the intent plan."""
 
     def compile(
         self,
@@ -55,56 +55,88 @@ class CasePlanCompiler(PlanCompiler):
     ) -> PlanIR:
         plan = super().compile(goal, strategy, context, task_budget)
         entry_url = context.values.get("entry_url", "").strip()
-        if not entry_url or goal.intent is IntentKind.NAVIGATE:
-            return plan
-        if ActionOp.NAVIGATE not in context.allowed_ops:
-            raise ValueError("case entry requires NAVIGATE capability")
-        if ActionOp.NAVIGATE in goal.forbidden_actions:
-            raise ValueError("case entry navigation is forbidden by the goal")
-
-        surface = context.require_query("surface")
-        ready = context.require_query("entry_ready")
         nodes = dict(plan.nodes)
-        if "enter-case-url" in nodes or "verify-case-entry" in nodes:
-            raise ValueError("case entry node id collides with the intent plan")
-        nodes["enter-case-url"] = PlanNode(
-            id="enter-case-url",
-            action=Action(
+        entry_node_id = plan.entry_node_id
+        changed = False
+
+        if entry_url and goal.intent is not IntentKind.NAVIGATE:
+            if ActionOp.NAVIGATE not in context.allowed_ops:
+                raise ValueError("case entry requires NAVIGATE capability")
+            if ActionOp.NAVIGATE in goal.forbidden_actions:
+                raise ValueError("case entry navigation is forbidden by the goal")
+
+            surface = context.require_query("surface")
+            ready = context.require_query("entry_ready")
+            if "enter-case-url" in nodes or "verify-case-entry" in nodes:
+                raise ValueError("case entry node id collides with the intent plan")
+            nodes["enter-case-url"] = PlanNode(
                 id="enter-case-url",
-                op=ActionOp.NAVIGATE,
-                value=entry_url,
-                postconditions=(
-                    Postcondition(
-                        kind=PostconditionKind.ELEMENT_VISIBLE,
-                        target="$verify",
+                action=Action(
+                    id="enter-case-url",
+                    op=ActionOp.NAVIGATE,
+                    value=entry_url,
+                    postconditions=(
+                        Postcondition(
+                            kind=PostconditionKind.ELEMENT_VISIBLE,
+                            target="$verify",
+                        ),
                     ),
                 ),
-            ),
-            surface=strategy.surface,
-            target_query=surface,
-            verification_query=ready,
-            success_edge="verify-case-entry",
-        )
-        nodes["verify-case-entry"] = PlanNode(
-            id="verify-case-entry",
-            action=Action(
+                surface=strategy.surface,
+                target_query=surface,
+                verification_query=ready,
+                success_edge="verify-case-entry",
+            )
+            nodes["verify-case-entry"] = PlanNode(
                 id="verify-case-entry",
-                op=ActionOp.ASSERT,
-                postconditions=(
-                    Postcondition(
-                        kind=PostconditionKind.ELEMENT_VISIBLE,
-                        target="$target",
+                action=Action(
+                    id="verify-case-entry",
+                    op=ActionOp.ASSERT,
+                    postconditions=(
+                        Postcondition(
+                            kind=PostconditionKind.ELEMENT_VISIBLE,
+                            target="$target",
+                        ),
                     ),
                 ),
-            ),
-            surface=strategy.surface,
-            target_query=ready,
-            success_edge=plan.entry_node_id,
-        )
+                surface=strategy.surface,
+                target_query=ready,
+                success_edge=entry_node_id,
+            )
+            entry_node_id = "enter-case-url"
+            changed = True
+
+        browser_entry_requested = bool(entry_url) or goal.intent is IntentKind.NAVIGATE
+        can_launch = ActionOp.LAUNCH_APPLICATION in context.allowed_ops
+        launch_forbidden = ActionOp.LAUNCH_APPLICATION in goal.forbidden_actions
+        if browser_entry_requested and can_launch and not launch_forbidden:
+            if "launch-case-browser" in nodes:
+                raise ValueError("browser launch node id collides with the intent plan")
+            nodes["launch-case-browser"] = PlanNode(
+                id="launch-case-browser",
+                action=Action(
+                    id="launch-case-browser",
+                    op=ActionOp.LAUNCH_APPLICATION,
+                    value="browser",
+                    postconditions=(
+                        Postcondition(
+                            kind=PostconditionKind.ELEMENT_VISIBLE,
+                            target="$execution",
+                        ),
+                    ),
+                ),
+                surface=strategy.surface,
+                success_edge=entry_node_id,
+            )
+            entry_node_id = "launch-case-browser"
+            changed = True
+
+        if not changed:
+            return plan
         return PlanIR(
             goal=plan.goal,
             strategy_id=plan.strategy_id,
-            entry_node_id="enter-case-url",
+            entry_node_id=entry_node_id,
             nodes=nodes,
             task_budget=plan.task_budget,
             compiler_version=f"{plan.compiler_version}-case-entry",
@@ -210,6 +242,8 @@ class CasePlanningContextProvider:
             or capability.physical_input is not Capability.UNSUPPORTED
         ):
             allowed.update(_INTERACTION_OPS)
+        if capability.application_launch is not Capability.UNSUPPORTED:
+            allowed.add(ActionOp.LAUNCH_APPLICATION)
         return PlanningContext(
             target_queries=queries,
             values=values,
