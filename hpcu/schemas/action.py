@@ -11,6 +11,7 @@ from typing import Optional
 
 
 class ActionOp(str, Enum):
+    LAUNCH_APPLICATION = "launch_application"
     FOCUS_WINDOW = "focus_window"
     NAVIGATE = "navigate"
     INVOKE = "invoke"
