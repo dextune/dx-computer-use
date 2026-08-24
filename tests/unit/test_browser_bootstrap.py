@@ -7,6 +7,8 @@ from hpcu.executor.executor import Executor
 from hpcu.grounder.grounder import Grounder
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.lifecycle.launcher import (
+    ApplicationCandidate,
+    ApplicationDiscoveryResult,
     ApplicationLaunchCapabilities,
     ApplicationLauncher,
     ApplicationLaunchResult,
@@ -57,16 +59,32 @@ class _Launcher(ApplicationLauncher):
         super().__init__("session")
         self.evidence_element_id = evidence_element_id
         self.calls: list[str] = []
+        self.candidate_ids: list[str | None] = []
+
+    async def discover(self, application: str) -> ApplicationDiscoveryResult:
+        candidate = ApplicationCandidate(
+            id="browser.desktop",
+            label="Browser",
+            window_class="Browser",
+            executable="browser",
+        )
+        return ApplicationDiscoveryResult(
+            application=application,
+            candidates=(candidate,),
+            preferred_candidate_id=candidate.id,
+        )
 
     async def launch(
         self,
         application: str,
         *,
+        candidate_id: str | None = None,
         timeout_ms: int,
         poll_interval_ms: int,
     ) -> ApplicationLaunchResult:
         del timeout_ms, poll_interval_ms
         self.calls.append(application)
+        self.candidate_ids.append(candidate_id)
         return ApplicationLaunchResult(
             success=True,
             application=application,
@@ -205,6 +223,7 @@ async def test_empty_desktop_launches_without_grounding_or_input():
     assert result.execution.evidence_element_id == "x11:42"
     assert result.scene.get("x11:42") is not None
     assert launcher.calls == ["browser"]
+    assert launcher.candidate_ids == [None]
     assert injector.calls == 0
 
 
