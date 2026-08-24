@@ -16,7 +16,11 @@ from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.failure_codes import FailureCode
 
 _PLANNING_PURPOSES = frozenset(
-    {ModelCallPurpose.INTENT_FILL, ModelCallPurpose.PLAN_COMPILE}
+    {
+        ModelCallPurpose.INTENT_FILL,
+        ModelCallPurpose.PLAN_COMPILE,
+        ModelCallPurpose.APPLICATION_SELECTION,
+    }
 )
 _RECOVERY_PURPOSES = frozenset(
     {
