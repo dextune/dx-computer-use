@@ -16,6 +16,7 @@ class ModelCallPurpose(str, Enum):
 
     INTENT_FILL = "intent_fill"
     PLAN_COMPILE = "plan_compile"
+    APPLICATION_SELECTION = "application_selection"
     GROUNDING = "grounding"
     SITUATION_ANALYSIS = "situation_analysis"
     ACTION_DECISION = "action_decision"
