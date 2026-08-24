@@ -23,13 +23,23 @@ from urllib.parse import urljoin
 from hpcu.capture.backend import CaptureBackend, CaptureCapabilities
 from hpcu.capture.frame_store import FrameStore
 from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
-from hpcu.input.keys import ENTER, ESCAPE, FOCUS_LOCATION, NEW_TAB, PAGE_DOWN, SELECT_ALL
+from hpcu.input.keys import (
+    ENTER,
+    ESCAPE,
+    FOCUS_LOCATION,
+    NEW_TAB,
+    PAGE_DOWN,
+    SELECT_ALL,
+)
 from hpcu.lifecycle.launcher import (
     ApplicationLaunchCapabilities,
     ApplicationLauncher,
     ApplicationLaunchResult,
 )
-from hpcu.observation.structure_observer import StructureCapabilities, StructureObserver
+from hpcu.observation.structure_observer import (
+    StructureCapabilities,
+    StructureObserver,
+)
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.coordinates import BoundingBox, CoordinateSpace, ScreenPoint
 from hpcu.schemas.failure_codes import FailureCode
@@ -108,16 +118,24 @@ done
 """.strip()
 _LAUNCH_DEFAULT_BROWSER_SCRIPT = r"""
 desktop=$1
-if [ -n "$desktop" ] && command -v gtk-launch >/dev/null 2>&1; then
-    nohup gtk-launch "$desktop" about:blank >/dev/null 2>&1 &
+application_id=${desktop%.desktop}
+if [ -n "$application_id" ] && command -v gtk-launch >/dev/null 2>&1; then
+    nohup gtk-launch "$application_id" >/dev/null 2>&1 &
     exit 0
 fi
 if command -v xdg-open >/dev/null 2>&1; then
-    nohup xdg-open about:blank >/dev/null 2>&1 &
+    nohup xdg-open http://127.0.0.1/ >/dev/null 2>&1 &
     exit 0
 fi
 exit 127
 """.strip()
+
+
+def _exec_ok(result: dict) -> bool:
+    """Accept only an explicit successful sandbox execution result."""
+    if "ok" in result:
+        return result.get("ok") is True
+    return result.get("code") in (0, "0")
 
 
 def png_dimensions(data: bytes) -> tuple[int, int]:
@@ -247,12 +265,8 @@ class GrokSandboxInjector(InputInjector):
             ref = element.sources[0].ref
             if ref:
                 activated = self._client.exec("xdotool", ["windowactivate", ref])
-                self._client.exec("xdotool", ["windowraise", ref])
-                ok = bool(activated.get("ok")) or activated.get("code") in (
-                    0,
-                    "0",
-                    None,
-                )
+                raised = self._client.exec("xdotool", ["windowraise", ref])
+                ok = _exec_ok(activated) and _exec_ok(raised)
                 return ExecutionResult(
                     success=ok,
                     mode="semantic",
@@ -281,7 +295,7 @@ class GrokSandboxInjector(InputInjector):
                 "xdotool",
                 ["mousemove", str(x), str(y), "click", "1"],
             )
-        elif action in ("double_click",):
+        elif action == "double_click":
             result = self._client.exec(
                 "xdotool",
                 [
@@ -294,7 +308,7 @@ class GrokSandboxInjector(InputInjector):
                     "1",
                 ],
             )
-        elif action in ("right_click",):
+        elif action == "right_click":
             result = self._client.exec(
                 "xdotool",
                 ["mousemove", str(x), str(y), "click", "3"],
@@ -319,7 +333,7 @@ class GrokSandboxInjector(InputInjector):
                 "xdotool",
                 ["mousemove", str(x), str(y)],
             )
-        ok = bool(result.get("ok")) or result.get("code") in (0, "0", None)
+        ok = _exec_ok(result)
         return ExecutionResult(
             success=ok,
             mode="physical",
@@ -391,7 +405,7 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
             ["-c", _LAUNCH_DEFAULT_BROWSER_SCRIPT, "hpcu-launch", desktop_id],
             timeout_ms=min(max(timeout_ms, 1), 10_000),
         )
-        if not self._exec_ok(launched):
+        if not _exec_ok(launched):
             return ApplicationLaunchResult(
                 success=False,
                 application=application,
@@ -439,13 +453,13 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
         self,
     ) -> tuple[str, FailureCode | None]:
         default = self._client.exec("sh", ["-c", _DEFAULT_BROWSER_SCRIPT])
-        if self._exec_ok(default):
+        if _exec_ok(default):
             desktop_id = self._first_line(default.get("stdout", ""))
             if desktop_id:
                 return desktop_id, None
 
         scanned = self._client.exec("sh", ["-c", _BROWSER_ENTRY_SCAN_SCRIPT])
-        if not self._exec_ok(scanned):
+        if not _exec_ok(scanned):
             return "", FailureCode.APPLICATION_NOT_FOUND
         entries = tuple(
             dict.fromkeys(
@@ -470,7 +484,7 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
                 desktop_id,
             ],
         )
-        if not self._exec_ok(result):
+        if not _exec_ok(result):
             return "", ""
         lines = str(result.get("stdout", "")).splitlines()
         startup_class = lines[0].strip() if lines else ""
@@ -479,7 +493,7 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
 
     def _window_inventory(self) -> tuple[tuple[str, str, str], ...]:
         result = self._client.exec("sh", ["-c", _WINDOW_INVENTORY_SCRIPT])
-        if not self._exec_ok(result):
+        if not _exec_ok(result):
             return ()
         windows: list[tuple[str, str, str]] = []
         for line in str(result.get("stdout", "")).splitlines():
@@ -494,7 +508,7 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
 
     def _active_window(self) -> str:
         result = self._client.exec("xdotool", ["getactivewindow"])
-        if not self._exec_ok(result):
+        if not _exec_ok(result):
             return ""
         return self._first_line(result.get("stdout", ""))
 
@@ -566,10 +580,6 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
             return ""
         return os.path.basename(parts[index])
 
-    @staticmethod
-    def _exec_ok(result: dict) -> bool:
-        return bool(result.get("ok")) or result.get("code") in (0, "0", None)
-
 
 class GrokSandboxStructure(StructureObserver):
     """Visible X11 windows via xdotool search/getwindowgeometry."""
@@ -591,7 +601,7 @@ class GrokSandboxStructure(StructureObserver):
                 "xdotool search --onlyvisible --name . 2>/dev/null",
             ],
         )
-        if not listing.get("ok"):
+        if not _exec_ok(listing):
             return ()
         window_ids = [
             line.strip()
