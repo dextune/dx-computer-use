@@ -46,6 +46,7 @@ _INTRINSIC_TARGET_OPS = frozenset(
     }
 )
 _TARGET_PLACEHOLDER = "$target"
+_EXECUTION_PLACEHOLDER = "$execution"
 
 
 @dataclass(frozen=True)
@@ -334,8 +335,56 @@ class ControlLoop:
                 action_attempted=True,
             )
 
+        verified_action = self._bind_execution_target(
+            targeted,
+            execution.evidence_element_id,
+        )
+        if (
+            targeted.op is ActionOp.LAUNCH_APPLICATION
+            and execution.evidence_element_id is None
+        ):
+            detection, recovery = self._remember_attempt(targeted, pre_scene)
+            return StepResult(
+                success=False,
+                scene=pre_scene,
+                failure_code=self._failure_after_recovery(
+                    FailureCode.APPLICATION_NOT_OBSERVED.value,
+                    recovery,
+                ),
+                grounding=grounding,
+                execution=execution,
+                pre_scene_version=pre_scene.version,
+                loop_detection=detection,
+                recovery_action=recovery,
+                action_attempted=True,
+            )
+
         try:
-            post_scene = await self._observe_scene()
+            if targeted.op is ActionOp.LAUNCH_APPLICATION:
+                post_scene, settled = await self._observe_until_postconditions(
+                    verified_action
+                )
+                if not settled:
+                    detection, recovery = self._remember_attempt(
+                        targeted, post_scene
+                    )
+                    return StepResult(
+                        success=False,
+                        scene=post_scene,
+                        failure_code=self._failure_after_recovery(
+                            FailureCode.APPLICATION_NOT_OBSERVED.value,
+                            recovery,
+                        ),
+                        grounding=grounding,
+                        execution=execution,
+                        pre_scene_version=pre_scene.version,
+                        post_scene_version=post_scene.version,
+                        loop_detection=detection,
+                        recovery_action=recovery,
+                        action_attempted=True,
+                    )
+            else:
+                post_scene = await self._observe_scene()
         except Exception as error:
             detection, recovery = self._remember_attempt(targeted, pre_scene)
             failure = self._exception_failure_code(
@@ -353,7 +402,6 @@ class ControlLoop:
                 action_attempted=True,
             )
 
-        verified_action = targeted
         verification_grounding = None
         if verification_query:
             try:
@@ -404,7 +452,8 @@ class ControlLoop:
                     action_attempted=True,
                 )
             verified_action = self._bind_verification_target(
-                targeted, verification_grounding.element_id
+                verified_action,
+                verification_grounding.element_id,
             )
 
         try:
@@ -563,6 +612,27 @@ class ControlLoop:
                     post_scene_version=scene.version,
                 )
 
+    async def _observe_until_postconditions(
+        self,
+        action: Action,
+    ) -> tuple[Scene, bool]:
+        """Poll fresh scenes until action postconditions are stably observable."""
+        deadline = self._monotonic() + action.timeout_ms / 1000.0
+        stable = 0
+        scene = self._scene
+        while True:
+            scene = await self._observe_scene()
+            holds = self._verifier.verify_postconditions(
+                action.postconditions,
+                scene,
+            )
+            stable = stable + 1 if holds else 0
+            if stable >= self._wait_stable_polls:
+                return scene, True
+            if self._monotonic() >= deadline:
+                return scene, False
+            await self._sleep(self._wait_poll_interval_ms / 1000.0)
+
     async def _observe_scene(self) -> Scene:
         delta = await self._observer.observe()
         scene = self._builder.update(self._scene, delta)
@@ -671,6 +741,19 @@ class ControlLoop:
             ),
             postconditions=postconditions,
         )
+
+    @staticmethod
+    def _bind_execution_target(
+        action: Action,
+        element_id: str | None,
+    ) -> Action:
+        postconditions = tuple(
+            replace(condition, target=element_id)
+            if condition.target == _EXECUTION_PLACEHOLDER
+            else condition
+            for condition in action.postconditions
+        )
+        return replace(action, postconditions=postconditions)
 
     @staticmethod
     def _bind_verification_target(
