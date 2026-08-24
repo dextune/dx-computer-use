@@ -11,6 +11,7 @@ from hpcu.gateway.json_response import select_json_object
 from hpcu.lifecycle.launcher import ApplicationCandidate, ApplicationLauncher
 from hpcu.runtime_config import semantic_call_timeout_ms
 from hpcu.schemas.action import ActionOp, ActionTarget
+from hpcu.schemas.capability import Capability
 from hpcu.schemas.plan import PlanIR
 
 
@@ -28,6 +29,8 @@ class ApplicationPlanResolver:
     ) -> PlanIR:
         if launcher is None:
             return plan
+        if launcher.capabilities().discovery is Capability.UNSUPPORTED:
+            return plan
         nodes = dict(plan.nodes)
         changed = False
         for node_id, node in tuple(nodes.items()):
@@ -39,7 +42,12 @@ class ApplicationPlanResolver:
             application = (action.value or "").strip()
             if not application:
                 continue
-            discovery = await launcher.discover(application)
+            try:
+                discovery = await launcher.discover(application)
+            except Exception:
+                # Discovery is advisory at plan time. Execution will retry through
+                # the typed lifecycle boundary and report an explicit failure.
+                continue
             if not discovery.candidates:
                 continue
             candidate_id = discovery.preferred_candidate_id
