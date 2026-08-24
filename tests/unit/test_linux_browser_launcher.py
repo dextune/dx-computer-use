@@ -30,10 +30,12 @@ class _BrowserHttp:
         default_desktop: str = "browser.desktop",
         scanned_entries: str = "",
         already_running: bool = False,
+        launch_ok: bool = True,
     ) -> None:
         self.default_desktop = default_desktop
         self.scanned_entries = scanned_entries
         self.already_running = already_running
+        self.launch_ok = launch_ok
         self.launched = False
         self.launch_calls = 0
 
@@ -89,8 +91,10 @@ class _BrowserHttp:
                 stdout = ""
             return _Response({"ok": True, "stdout": stdout, "code": 0})
         if "gtk-launch" in script:
-            self.launched = True
             self.launch_calls += 1
+            if not self.launch_ok:
+                return _Response({"ok": False, "stdout": ""})
+            self.launched = True
             return _Response({"ok": True, "stdout": "", "code": 0})
         return _Response({"ok": True, "stdout": "", "code": 0})
 
@@ -173,3 +177,22 @@ async def test_launcher_reports_missing_browser_without_executable_guessing():
     assert result.success is False
     assert result.failure_code == FailureCode.APPLICATION_NOT_FOUND.value
     assert http.launch_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_launcher_rejects_explicit_failed_exec_without_exit_code():
+    http = _BrowserHttp(launch_ok=False)
+    launcher = GrokSandboxApplicationLauncher(
+        "session",
+        client=SandboxHttpClient("http://sandbox.test", http=http),
+    )
+
+    result = await launcher.launch(
+        "browser",
+        timeout_ms=100,
+        poll_interval_ms=1,
+    )
+
+    assert result.success is False
+    assert result.failure_code == FailureCode.APPLICATION_LAUNCH_FAILED.value
+    assert http.launch_calls == 1
