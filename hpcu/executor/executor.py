@@ -12,8 +12,10 @@ from typing import Callable, Optional
 
 from hpcu.input.injector import ExecutionResult, InputInjector
 from hpcu.input.keys import ENTER, FOCUS_LOCATION
+from hpcu.lifecycle.launcher import ApplicationLauncher
 from hpcu.runtime_config import load_runtime_config
 from hpcu.schemas.action import Action, ActionOp
+from hpcu.schemas.capability import Capability
 from hpcu.schemas.coordinates import BoundingBox, ScreenPoint
 from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.scene import Scene
@@ -86,10 +88,17 @@ class Executor:
         sleep=None,
         monotonic=None,
         config: Optional[dict] = None,
+        application_launcher: ApplicationLauncher | None = None,
     ):
         runtime = config if config is not None else load_runtime_config()
         performance = runtime.get("performance", {})
         self._injector = injector
+        self._application_launcher = application_launcher
+        if (
+            application_launcher is not None
+            and application_launcher.session_id != injector.session_id
+        ):
+            raise ValueError("application launcher and input must share session_id")
         self._poll_interval_ms = (
             poll_interval_ms
             if poll_interval_ms is not None
@@ -106,6 +115,10 @@ class Executor:
     @property
     def injector(self) -> InputInjector:
         return self._injector
+
+    @property
+    def application_launcher(self) -> ApplicationLauncher | None:
+        return self._application_launcher
 
     def prepare(
         self,
@@ -144,6 +157,9 @@ class Executor:
         if stale is not None:
             return stale
 
+        if prepared.action.op is ActionOp.LAUNCH_APPLICATION:
+            return await self._launch_application(prepared)
+
         if prepared.action.op is ActionOp.NAVIGATE:
             return await self._navigate(prepared)
 
@@ -166,6 +182,46 @@ class Executor:
             success=False,
             mode="none",
             failure_code=FailureCode.INPUT_PHYSICAL_UNSUPPORTED.value,
+        )
+
+    async def _launch_application(
+        self, prepared: PreparedAction
+    ) -> ExecutionResult:
+        application = (prepared.action.value or "").strip()
+        launcher = self._application_launcher
+        if not application:
+            return ExecutionResult(
+                success=False,
+                mode="application",
+                failure_code=FailureCode.ACTION_UNSUPPORTED.value,
+            )
+        if (
+            launcher is None
+            or launcher.capabilities().launch is Capability.UNSUPPORTED
+        ):
+            return ExecutionResult(
+                success=False,
+                mode="application",
+                failure_code=FailureCode.APPLICATION_LAUNCH_UNSUPPORTED.value,
+            )
+        result = await launcher.launch(
+            application,
+            timeout_ms=prepared.action.timeout_ms,
+            poll_interval_ms=self._poll_interval_ms,
+        )
+        return ExecutionResult(
+            success=result.success,
+            mode="application",
+            failure_code=(
+                result.failure_code
+                if result.failure_code is not None
+                else (
+                    None
+                    if result.success
+                    else FailureCode.APPLICATION_LAUNCH_FAILED.value
+                )
+            ),
+            evidence_element_id=result.evidence_element_id,
         )
 
     async def _navigate(self, prepared: PreparedAction) -> ExecutionResult:
