@@ -12,6 +12,7 @@ from hpcu.gateway.gateway import (
     RetryableGateway,
     walk_gateway_chain,
 )
+from hpcu.lifecycle.resolver import ApplicationPlanResolver
 from hpcu.planning.goal_interpreter import GoalInterpreter
 from hpcu.planning.plan_compiler import PlanCompiler
 from hpcu.planning.semantic_interrupt import SemanticSlotFiller
@@ -129,6 +130,9 @@ class CommandRuntime:
         self._goal_interpreter = goal_interpreter or GoalInterpreter()
         self._strategy_planner = strategy_planner or StrategyPlanner()
         self._plan_compiler = plan_compiler or PlanCompiler()
+        self._application_plan_resolver = ApplicationPlanResolver(
+            config=self._config
+        )
         self._local_repairer = local_repairer
         self._semantic_replanner_factory = semantic_replanner_factory
 
@@ -181,13 +185,18 @@ class CommandRuntime:
             context,
             task_budget,
         )
+        control_loop = self._control_loop_factory()
+        plan = await self._application_plan_resolver.resolve(
+            plan,
+            control_loop.executor.application_launcher,
+            gateway,
+        )
         semantic_replanner = (
             self._semantic_replanner_factory(gateway, ledger)
             if gateway is not None
             and self._semantic_replanner_factory is not None
             else None
         )
-        control_loop = self._control_loop_factory()
         begin_task = getattr(control_loop, "begin_task", None)
         if callable(begin_task):
             begin_task()
