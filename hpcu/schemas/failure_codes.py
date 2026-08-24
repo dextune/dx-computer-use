@@ -19,6 +19,12 @@ class FailureCode(str, Enum):
     # --- structure ---
     STRUCTURE_TREE_EMPTY = "structure_tree_empty"
 
+    # --- application lifecycle ---
+    APPLICATION_LAUNCH_UNSUPPORTED = "application_launch_unsupported"
+    APPLICATION_NOT_FOUND = "application_not_found"
+    APPLICATION_LAUNCH_FAILED = "application_launch_failed"
+    APPLICATION_NOT_OBSERVED = "application_not_observed"
+
     # --- input ---
     INPUT_PERMISSION_DENIED = "input_permission_denied"
     INPUT_SEMANTIC_UNSUPPORTED = "input_semantic_unsupported"
