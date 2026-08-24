@@ -32,6 +32,8 @@ from hpcu.input.keys import (
     SELECT_ALL,
 )
 from hpcu.lifecycle.launcher import (
+    ApplicationCandidate,
+    ApplicationDiscoveryResult,
     ApplicationLaunchCapabilities,
     ApplicationLauncher,
     ApplicationLaunchResult,
@@ -97,9 +99,10 @@ for dir in \
 do
     file="$dir/$desktop"
     [ -f "$file" ] || continue
+    name=$(sed -n 's/^Name=//p' "$file" | head -n 1)
     wm_class=$(sed -n 's/^StartupWMClass=//p' "$file" | head -n 1)
     exec_line=$(sed -n 's/^Exec=//p' "$file" | head -n 1)
-    printf '%s\n%s\n' "$wm_class" "$exec_line"
+    printf '%s\n%s\n%s\n' "$name" "$wm_class" "$exec_line"
     exit 0
 done
 exit 0
@@ -366,34 +369,68 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
         self._sleep = sleep if sleep is not None else asyncio.sleep
         self._monotonic = monotonic if monotonic is not None else time.monotonic
 
-    async def launch(
-        self,
-        application: str,
-        *,
-        timeout_ms: int,
-        poll_interval_ms: int,
-    ) -> ApplicationLaunchResult:
+    async def discover(self, application: str) -> ApplicationDiscoveryResult:
         if application.strip().casefold() != "browser":
-            return ApplicationLaunchResult(
-                success=False,
+            return ApplicationDiscoveryResult(
                 application=application,
                 failure_code=FailureCode.APPLICATION_LAUNCH_UNSUPPORTED.value,
             )
 
-        desktop_id, failure = self._discover_browser_desktop_id()
-        if failure is not None:
+        default_id = self._default_browser_desktop_id()
+        if default_id:
+            candidate = self._candidate(default_id)
+            return ApplicationDiscoveryResult(
+                application=application,
+                candidates=(candidate,),
+                preferred_candidate_id=candidate.id,
+            )
+
+        entries = self._scan_browser_desktop_ids()
+        if not entries:
+            return ApplicationDiscoveryResult(
+                application=application,
+                failure_code=FailureCode.APPLICATION_NOT_FOUND.value,
+            )
+        candidates = tuple(self._candidate(desktop_id) for desktop_id in entries)
+        return ApplicationDiscoveryResult(
+            application=application,
+            candidates=candidates,
+            preferred_candidate_id=(candidates[0].id if len(candidates) == 1 else None),
+        )
+
+    async def launch(
+        self,
+        application: str,
+        *,
+        candidate_id: str | None = None,
+        timeout_ms: int,
+        poll_interval_ms: int,
+    ) -> ApplicationLaunchResult:
+        discovery = await self.discover(application)
+        if not discovery.candidates:
             return ApplicationLaunchResult(
                 success=False,
                 application=application,
-                failure_code=failure.value,
+                failure_code=(
+                    discovery.failure_code
+                    or FailureCode.APPLICATION_NOT_FOUND.value
+                ),
             )
-        startup_class, executable = self._desktop_metadata(desktop_id)
+
+        candidate = self._select_candidate(discovery, candidate_id)
+        if candidate is None:
+            return ApplicationLaunchResult(
+                success=False,
+                application=application,
+                failure_code=FailureCode.DECISION_REQUIRED.value,
+            )
+
         baseline = self._window_inventory()
         baseline_ids = {window_id for window_id, _, _ in baseline}
         matching = self._matching_windows(
             baseline,
-            startup_class=startup_class,
-            executable=executable,
+            startup_class=candidate.window_class,
+            executable=candidate.executable,
         )
         active = self._active_window()
         existing = self._choose_window(matching, active)
@@ -402,7 +439,12 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
 
         launched = self._client.exec(
             "sh",
-            ["-c", _LAUNCH_DEFAULT_BROWSER_SCRIPT, "hpcu-launch", desktop_id],
+            [
+                "-c",
+                _LAUNCH_DEFAULT_BROWSER_SCRIPT,
+                "hpcu-launch",
+                candidate.id,
+            ],
             timeout_ms=min(max(timeout_ms, 1), 10_000),
         )
         if not _exec_ok(launched):
@@ -418,8 +460,8 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
             inventory = self._window_inventory()
             matching = self._matching_windows(
                 inventory,
-                startup_class=startup_class,
-                executable=executable,
+                startup_class=candidate.window_class,
+                executable=candidate.executable,
             )
             active = self._active_window()
             chosen = self._choose_window(matching, active)
@@ -449,32 +491,34 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
             discovery=Capability.SUPPORTED,
         )
 
-    def _discover_browser_desktop_id(
-        self,
-    ) -> tuple[str, FailureCode | None]:
-        default = self._client.exec("sh", ["-c", _DEFAULT_BROWSER_SCRIPT])
-        if _exec_ok(default):
-            desktop_id = self._first_line(default.get("stdout", ""))
-            if desktop_id:
-                return desktop_id, None
+    def _default_browser_desktop_id(self) -> str:
+        result = self._client.exec("sh", ["-c", _DEFAULT_BROWSER_SCRIPT])
+        if not _exec_ok(result):
+            return ""
+        return self._first_line(result.get("stdout", ""))
 
-        scanned = self._client.exec("sh", ["-c", _BROWSER_ENTRY_SCAN_SCRIPT])
-        if not _exec_ok(scanned):
-            return "", FailureCode.APPLICATION_NOT_FOUND
-        entries = tuple(
+    def _scan_browser_desktop_ids(self) -> tuple[str, ...]:
+        result = self._client.exec("sh", ["-c", _BROWSER_ENTRY_SCAN_SCRIPT])
+        if not _exec_ok(result):
+            return ()
+        return tuple(
             dict.fromkeys(
                 line.strip()
-                for line in str(scanned.get("stdout", "")).splitlines()
+                for line in str(result.get("stdout", "")).splitlines()
                 if line.strip()
             )
         )
-        if len(entries) == 1:
-            return entries[0], None
-        if len(entries) > 1:
-            return "", FailureCode.DECISION_REQUIRED
-        return "", FailureCode.APPLICATION_NOT_FOUND
 
-    def _desktop_metadata(self, desktop_id: str) -> tuple[str, str]:
+    def _candidate(self, desktop_id: str) -> ApplicationCandidate:
+        label, window_class, executable = self._desktop_metadata(desktop_id)
+        return ApplicationCandidate(
+            id=desktop_id,
+            label=label or desktop_id,
+            window_class=window_class,
+            executable=executable,
+        )
+
+    def _desktop_metadata(self, desktop_id: str) -> tuple[str, str, str]:
         result = self._client.exec(
             "sh",
             [
@@ -485,11 +529,12 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
             ],
         )
         if not _exec_ok(result):
-            return "", ""
+            return desktop_id, "", ""
         lines = str(result.get("stdout", "")).splitlines()
-        startup_class = lines[0].strip() if lines else ""
-        exec_line = lines[1].strip() if len(lines) > 1 else ""
-        return startup_class, self._executable_name(exec_line)
+        label = lines[0].strip() if lines else desktop_id
+        window_class = lines[1].strip() if len(lines) > 1 else ""
+        exec_line = lines[2].strip() if len(lines) > 2 else ""
+        return label, window_class, self._executable_name(exec_line)
 
     def _window_inventory(self) -> tuple[tuple[str, str, str], ...]:
         result = self._client.exec("sh", ["-c", _WINDOW_INVENTORY_SCRIPT])
@@ -511,6 +556,31 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
         if not _exec_ok(result):
             return ""
         return self._first_line(result.get("stdout", ""))
+
+    @staticmethod
+    def _select_candidate(
+        discovery: ApplicationDiscoveryResult,
+        candidate_id: str | None,
+    ) -> ApplicationCandidate | None:
+        if candidate_id is not None:
+            return next(
+                (
+                    candidate
+                    for candidate in discovery.candidates
+                    if candidate.id == candidate_id
+                ),
+                None,
+            )
+        preferred = discovery.preferred_candidate_id
+        if preferred is not None:
+            return next(
+                candidate
+                for candidate in discovery.candidates
+                if candidate.id == preferred
+            )
+        if len(discovery.candidates) == 1:
+            return discovery.candidates[0]
+        return None
 
     @staticmethod
     def _matching_windows(
