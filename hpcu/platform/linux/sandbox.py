@@ -392,10 +392,15 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
                 failure_code=FailureCode.APPLICATION_NOT_FOUND.value,
             )
         candidates = tuple(self._candidate(desktop_id) for desktop_id in entries)
+        preferred = (
+            candidates[0].id
+            if len(candidates) == 1
+            else self._preferred_observed_candidate(candidates)
+        )
         return ApplicationDiscoveryResult(
             application=application,
             candidates=candidates,
-            preferred_candidate_id=(candidates[0].id if len(candidates) == 1 else None),
+            preferred_candidate_id=preferred,
         )
 
     async def launch(
@@ -556,6 +561,35 @@ class GrokSandboxApplicationLauncher(ApplicationLauncher):
         if not _exec_ok(result):
             return ""
         return self._first_line(result.get("stdout", ""))
+
+    def _preferred_observed_candidate(
+        self,
+        candidates: tuple[ApplicationCandidate, ...],
+    ) -> str | None:
+        inventory = self._window_inventory()
+        if not inventory:
+            return None
+        active = self._active_window()
+        active_candidates: list[str] = []
+        visible_candidates: list[str] = []
+        for candidate in candidates:
+            matches = self._matching_windows(
+                inventory,
+                startup_class=candidate.window_class,
+                executable=candidate.executable,
+            )
+            if not matches:
+                continue
+            visible_candidates.append(candidate.id)
+            if active and active in matches:
+                active_candidates.append(candidate.id)
+        if len(active_candidates) == 1:
+            return active_candidates[0]
+        if active_candidates:
+            return None
+        if len(visible_candidates) == 1:
+            return visible_candidates[0]
+        return None
 
     @staticmethod
     def _select_candidate(
