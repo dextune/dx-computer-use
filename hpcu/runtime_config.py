@@ -18,10 +18,12 @@ _DEFAULTS: dict[str, Any] = {
         "request_limits": {
             "plan_compile_max_tokens": 131072,
             "intent_fill_max_tokens": 32768,
+            "application_selection_max_tokens": 256,
             "action_decision_max_tokens": 65536,
             "reanalysis_max_tokens": 65536,
             "intent_fill_retry_attempts": 1,
             "plan_compile_retry_attempts": 2,
+            "application_selection_retry_attempts": 1,
             "grounding_retry_attempts": 1,
             "action_decision_retry_attempts": 2,
             "reanalysis_retry_attempts": 2,
@@ -31,6 +33,7 @@ _DEFAULTS: dict[str, Any] = {
         "routes": {
             "intent_fill": "minimax",
             "plan_compile": "minimax",
+            "application_selection": "minimax",
             "grounding": "minimax",
             "situation_analysis": "minimax",
             "action_decision": "minimax",
@@ -176,12 +179,14 @@ def semantic_retry_attempts(
     )
     plan = int(limits.get("plan_compile_retry_attempts", 2))
     intent = int(limits.get("intent_fill_retry_attempts", 1))
+    application = int(limits.get("application_selection_retry_attempts", 1))
     grounding = int(limits.get("grounding_retry_attempts", 1))
     action = int(limits.get("action_decision_retry_attempts", 2))
     reanalysis = int(limits.get("reanalysis_retry_attempts", 2))
     policy = {
         ModelCallPurpose.INTENT_FILL: intent,
         ModelCallPurpose.PLAN_COMPILE: plan,
+        ModelCallPurpose.APPLICATION_SELECTION: application,
         ModelCallPurpose.GROUNDING: grounding,
         ModelCallPurpose.SITUATION_ANALYSIS: action,
         ModelCallPurpose.ACTION_DECISION: action,
