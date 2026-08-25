@@ -229,6 +229,25 @@ async def test_ambiguous_candidates_without_gateway_remain_unbound():
 
 
 @pytest.mark.asyncio
+async def test_resolved_application_candidate_changes_plan_identity():
+    first_launcher = _Launcher(
+        (_candidate("first.desktop"),),
+        preferred_candidate_id="first.desktop",
+    )
+    second_launcher = _Launcher(
+        (_candidate("second.desktop"),),
+        preferred_candidate_id="second.desktop",
+    )
+
+    first = await _resolver().resolve(_plan(), first_launcher, None)
+    second = await _resolver().resolve(_plan(), second_launcher, None)
+
+    assert first.nodes["launch"].action.target.locator is None
+    assert second.nodes["launch"].action.target.locator is None
+    assert first.plan_hash != second.plan_hash
+
+
+@pytest.mark.asyncio
 async def test_executor_uses_candidate_field_instead_of_ui_locator():
     launcher = _Launcher((_candidate("browser.desktop"),))
     executor = Executor(_NoInput(), application_launcher=launcher)

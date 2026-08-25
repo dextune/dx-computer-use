@@ -134,6 +134,7 @@ def _node_payload(node: PlanNode) -> dict[str, object]:
                 "element_id": action.target.element_id,
                 "locator": action.target.locator,
             },
+            "application_candidate_id": action.application_candidate_id,
             "pre": [
                 (condition.kind.value, condition.target, condition.value)
                 for condition in action.preconditions
