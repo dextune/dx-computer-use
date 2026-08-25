@@ -2,7 +2,9 @@
 
 import pytest
 
+from hpcu.executor.executor import Executor
 from hpcu.gateway.gateway import Gateway, GatewayResponse, ModelCallPurpose
+from hpcu.input.injector import ExecutionResult, InputCapabilities, InputInjector
 from hpcu.lifecycle.launcher import (
     ApplicationCandidate,
     ApplicationDiscoveryResult,
@@ -12,9 +14,10 @@ from hpcu.lifecycle.launcher import (
 )
 from hpcu.lifecycle.resolver import ApplicationPlanResolver
 from hpcu.runtime_core.task_budget import BudgetedGateway, TaskBudgetLedger
-from hpcu.schemas.action import Action, ActionOp
+from hpcu.schemas.action import Action, ActionOp, ActionTarget
 from hpcu.schemas.budget import TaskBudgetSpec
 from hpcu.schemas.capability import Capability
+from hpcu.schemas.coordinates import ScreenPoint
 from hpcu.schemas.goal import GoalEnvelope, IntentKind
 from hpcu.schemas.plan import PlanIR, PlanNode
 from hpcu.schemas.surface import SurfaceKind
@@ -34,6 +37,7 @@ class _Launcher(ApplicationLauncher):
         self._preferred = preferred_candidate_id
         self.discover_calls = 0
         self.launch_calls = 0
+        self.candidate_ids: list[str | None] = []
 
     async def discover(self, application: str) -> ApplicationDiscoveryResult:
         self.discover_calls += 1
@@ -51,8 +55,9 @@ class _Launcher(ApplicationLauncher):
         timeout_ms: int,
         poll_interval_ms: int,
     ) -> ApplicationLaunchResult:
-        del candidate_id, timeout_ms, poll_interval_ms
+        del timeout_ms, poll_interval_ms
         self.launch_calls += 1
+        self.candidate_ids.append(candidate_id)
         return ApplicationLaunchResult(success=True, application=application)
 
     def capabilities(self) -> ApplicationLaunchCapabilities:
@@ -60,6 +65,27 @@ class _Launcher(ApplicationLauncher):
             launch=Capability.SUPPORTED,
             discovery=Capability.SUPPORTED,
         )
+
+
+class _NoInput(InputInjector):
+    def __init__(self) -> None:
+        super().__init__("session")
+
+    async def semantic(self, element, action: str) -> ExecutionResult:
+        del element, action
+        return ExecutionResult(success=False, mode="semantic")
+
+    async def physical(
+        self,
+        point: ScreenPoint,
+        action: str,
+        text: str | None = None,
+    ) -> ExecutionResult:
+        del point, action, text
+        return ExecutionResult(success=False, mode="physical")
+
+    def capabilities(self) -> InputCapabilities:
+        return InputCapabilities()
 
 
 class _Gateway(Gateway):
@@ -200,3 +226,21 @@ async def test_ambiguous_candidates_without_gateway_remain_unbound():
     assert action.application_candidate_id is None
     assert action.target.locator is None
     assert launcher.launch_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_executor_uses_candidate_field_instead_of_ui_locator():
+    launcher = _Launcher((_candidate("browser.desktop"),))
+    executor = Executor(_NoInput(), application_launcher=launcher)
+    action = Action(
+        id="launch",
+        op=ActionOp.LAUNCH_APPLICATION,
+        value="browser",
+        target=ActionTarget(locator="legacy-ui-locator"),
+        application_candidate_id="browser.desktop",
+    )
+
+    result = await executor.execute(executor.prepare(action, None))
+
+    assert result.success is True
+    assert launcher.candidate_ids == ["browser.desktop"]
