@@ -228,7 +228,8 @@ async def test_command_runtime_binds_os_candidate_before_task_execution():
     )
 
     launch = result.plan.nodes["launch-case-browser"].action
-    assert launch.target.locator == "second.desktop"
+    assert launch.application_candidate_id == "second.desktop"
+    assert launch.target.locator is None
     assert result.model_calls == 1
     assert result.model_calls_by_purpose == (("application_selection", 1),)
     assert gateway.calls == [ModelCallPurpose.APPLICATION_SELECTION]
