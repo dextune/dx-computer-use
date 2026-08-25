@@ -69,6 +69,21 @@ perception:
   line_y_tolerance_px: 8
   ocr_cache_entries: 32
   dirty_roi_max_ratio: 0.35
+  segmentation:
+    gradient_threshold: 24
+    whitespace_density_threshold: 0.01
+    min_whitespace_gap_px: 8
+    min_region_width_px: 24
+    min_region_height_px: 16
+    min_region_area_px: 64
+    max_depth: 5
+    max_regions_per_frame: 256
+    max_components_per_roi: 512
+    merge_gap_px: 6
+    alignment_tolerance_px: 6
+    fingerprint_quantum_px: 8
+    repeated_size_tolerance_ratio: 0.15
+    repeated_min_group_size: 3
 
 scene_graph:
   index_cell_size_px: 128

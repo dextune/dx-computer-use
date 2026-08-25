@@ -8,6 +8,11 @@ from hpcu.perception.engine import (
     merge_into_lines,
     normalize_ocr_text,
 )
+from hpcu.perception.segmentation import (
+    LayoutSegmenter,
+    SegmentationPolicy,
+    SegmentationResult,
+)
 from hpcu.perception.window_chrome import (
     content_roi,
     is_in_chrome,
@@ -16,7 +21,10 @@ from hpcu.perception.window_chrome import (
 )
 
 __all__ = [
+    "LayoutSegmenter",
     "ScreenPerception",
+    "SegmentationPolicy",
+    "SegmentationResult",
     "consent_elements",
     "is_blocked_scene",
     "content_roi",
