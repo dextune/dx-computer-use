@@ -8,6 +8,7 @@ from hpcu.perception.engine import (
     merge_into_lines,
     normalize_ocr_text,
 )
+from hpcu.perception.fusion import FusionEngine, FusionPolicy, FusionResult
 from hpcu.perception.segmentation import (
     LayoutSegmenter,
     SegmentationPolicy,
@@ -21,6 +22,9 @@ from hpcu.perception.window_chrome import (
 )
 
 __all__ = [
+    "FusionEngine",
+    "FusionPolicy",
+    "FusionResult",
     "LayoutSegmenter",
     "ScreenPerception",
     "SegmentationPolicy",
