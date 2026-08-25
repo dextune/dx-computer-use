@@ -18,7 +18,7 @@ from hpcu.perception.fusion import FusionEngine
 from hpcu.perception.window_chrome import content_roi, primary_window
 from hpcu.scene_graph.tracker import ElementTracker
 from hpcu.schemas.scene import FrameHandle, Scene, SceneDelta
-from hpcu.schemas.ui_element import UIElement
+from hpcu.schemas.ui_element import ElementRelations, UIElement
 
 
 class ObservationTransactionTimeout(TimeoutError):
@@ -92,7 +92,9 @@ class CompositeObserver(Observer):
         self._fusion_engine = (
             fusion_engine if fusion_engine is not None else FusionEngine()
         )
-        self._tracker = tracker if tracker is not None else ElementTracker()
+        self._tracker = (
+            tracker if tracker is not None else ElementTracker(config=config)
+        )
         self._config = config
         self._version = 0
         self._capture_started = False
@@ -206,7 +208,7 @@ class CompositeObserver(Observer):
             fused = self._fusion_engine.fuse(current.values())
             current = {element.id: element for element in fused.elements}
 
-        remapped = self._remap_ids(current)
+        remapped = self._remap_ids(current, frame=frame)
         base_version = self._version
         self._version += 1
         added, removed, modified = self._diff(self._previous, remapped)
@@ -271,23 +273,75 @@ class CompositeObserver(Observer):
     def _remap_ids(
         self,
         current: dict[str, UIElement],
+        *,
+        frame: FrameHandle | None = None,
     ) -> dict[str, UIElement]:
+        next_version = self._version + 1
+        observed_at = _observation_clock(frame, next_version)
         if not self._previous:
-            return dict(current)
-        fingerprint_map = self._tracker.match_by_fingerprint(
+            return {
+                element_id: _new_identity_element(
+                    element,
+                    element_id=element_id,
+                    scene_version=next_version,
+                    observed_at=observed_at,
+                    relations=element.relations,
+                )
+                for element_id, element in current.items()
+            }
+
+        matches = self._tracker.match(
             current,
             self._previous,
+            dirty_rects=frame.dirty_rects if frame is not None else (),
         )
-        remapped: dict[str, UIElement] = {}
-        for current_id, element in current.items():
-            previous_id = fingerprint_map.get(current_id, current_id)
-            if previous_id != current_id:
-                remapped[previous_id] = replace(
-                    element,
-                    id=previous_id,
-                )
+        id_map: dict[str, str] = {}
+        used_final_ids: set[str] = set()
+        reserved_ids = set(current) | set(self._previous)
+        for current_id in sorted(current):
+            previous_id = matches.get(current_id)
+            if previous_id is not None and previous_id not in used_final_ids:
+                stable_id = previous_id
+            elif current_id not in self._previous and current_id not in used_final_ids:
+                stable_id = current_id
             else:
-                remapped[current_id] = element
+                stable_id = _fresh_element_id(
+                    current_id,
+                    next_version,
+                    reserved_ids | used_final_ids,
+                )
+            id_map[current_id] = stable_id
+            used_final_ids.add(stable_id)
+
+        remapped: dict[str, UIElement] = {}
+        for current_id in sorted(current):
+            element = current[current_id]
+            stable_id = id_map[current_id]
+            previous_id = matches.get(current_id)
+            relations = _remap_relations(element.relations, id_map)
+            if previous_id is None:
+                remapped[stable_id] = _new_identity_element(
+                    element,
+                    element_id=stable_id,
+                    scene_version=next_version,
+                    observed_at=observed_at,
+                    relations=relations,
+                )
+                continue
+            previous = self._previous[previous_id]
+            remapped[stable_id] = replace(
+                element,
+                id=stable_id,
+                scene_version=next_version,
+                relations=relations,
+                first_seen_at=(
+                    previous.first_seen_at
+                    or element.first_seen_at
+                    or observed_at
+                ),
+                last_seen_at=observed_at,
+                stable_frames=max(1, previous.stable_frames) + 1,
+            )
         return remapped
 
     @staticmethod
@@ -327,6 +381,74 @@ class CompositeObserver(Observer):
                 f"{label} backend is bound to {backend_session!r}, "
                 f"observer to {self._session_id!r}"
             )
+
+
+def _observation_clock(frame: FrameHandle | None, scene_version: int) -> int:
+    if frame is not None and frame.timestamp_ns > 0:
+        return frame.timestamp_ns
+    return scene_version
+
+
+def _new_identity_element(
+    element: UIElement,
+    *,
+    element_id: str,
+    scene_version: int,
+    observed_at: int,
+    relations: ElementRelations,
+) -> UIElement:
+    return replace(
+        element,
+        id=element_id,
+        scene_version=scene_version,
+        relations=relations,
+        first_seen_at=element.first_seen_at or observed_at,
+        last_seen_at=observed_at,
+        stable_frames=max(1, element.stable_frames),
+    )
+
+
+def _fresh_element_id(
+    current_id: str,
+    scene_version: int,
+    occupied: set[str],
+) -> str:
+    base = f"{current_id}@{scene_version}"
+    candidate = base
+    suffix = 2
+    while candidate in occupied:
+        candidate = f"{base}:{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _remap_relations(
+    relations: ElementRelations,
+    id_map: dict[str, str],
+) -> ElementRelations:
+    def one(value: str | None) -> str | None:
+        if value is None:
+            return None
+        return id_map.get(value, value)
+
+    def many(values: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(id_map.get(value, value) for value in values))
+
+    return ElementRelations(
+        parent=one(relations.parent),
+        label_for=one(relations.label_for),
+        same_row=many(relations.same_row),
+        same_column=many(relations.same_column),
+        above=many(relations.above),
+        below=many(relations.below),
+        left_of=many(relations.left_of),
+        right_of=many(relations.right_of),
+        contains=many(relations.contains),
+        overlays=many(relations.overlays),
+        modal_owner=one(relations.modal_owner),
+        scroll_container=one(relations.scroll_container),
+        repeated_group=one(relations.repeated_group),
+    )
 
 
 def _auto_perception(

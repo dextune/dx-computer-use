@@ -110,6 +110,19 @@ perception:
 
 scene_graph:
   index_cell_size_px: 128
+  temporal:
+    min_score: 0.65
+    min_assignment_margin: 0.08
+    max_center_distance_px: 160
+    dirty_boundary_px: 32
+    text_max_chars: 160
+    weights:
+      iou: 0.24
+      center: 0.18
+      text: 0.14
+      role: 0.14
+      source_continuity: 0.20
+      parent_continuity: 0.10
   relations:
     containment_ratio: 0.95
     row_center_tolerance_px: 8
