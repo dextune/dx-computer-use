@@ -84,6 +84,29 @@ perception:
     fingerprint_quantum_px: 8
     repeated_size_tolerance_ratio: 0.15
     repeated_min_group_size: 3
+  fusion:
+    min_score: 0.72
+    min_geometry_overlap: 0.50
+    min_assignment_margin: 0.08
+    max_center_distance_px: 96
+    spatial_cell_size_px: 128
+    text_max_chars: 160
+    fingerprint_quantum_px: 4
+    weights:
+      iou: 0.22
+      containment: 0.18
+      center: 0.14
+      text: 0.22
+      role: 0.14
+      source_ref: 0.10
+    source_reliability:
+      dom: 1.00
+      uia: 0.96
+      atspi: 0.93
+      ax: 0.93
+      ocr: 0.55
+      template: 0.60
+      unknown: 0.40
 
 scene_graph:
   index_cell_size_px: 128
