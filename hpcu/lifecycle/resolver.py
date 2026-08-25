@@ -10,7 +10,7 @@ from hpcu.gateway.gateway import Gateway, ModelCallPurpose
 from hpcu.gateway.json_response import select_json_object
 from hpcu.lifecycle.launcher import ApplicationCandidate, ApplicationLauncher
 from hpcu.runtime_config import semantic_call_timeout_ms
-from hpcu.schemas.action import ActionOp, ActionTarget
+from hpcu.schemas.action import ActionOp
 from hpcu.schemas.capability import Capability
 from hpcu.schemas.plan import PlanIR
 
@@ -37,7 +37,7 @@ class ApplicationPlanResolver:
             action = node.action
             if action.op is not ActionOp.LAUNCH_APPLICATION:
                 continue
-            if action.target.locator:
+            if action.application_candidate_id:
                 continue
             application = (action.value or "").strip()
             if not application:
@@ -69,10 +69,7 @@ class ApplicationPlanResolver:
                 node,
                 action=replace(
                     action,
-                    target=ActionTarget(
-                        element_id=action.target.element_id,
-                        locator=candidate_id,
-                    ),
+                    application_candidate_id=candidate_id,
                 ),
             )
             changed = True
@@ -104,7 +101,7 @@ class ApplicationPlanResolver:
                 timeout_ms=semantic_call_timeout_ms(self._config),
             )
         except Exception:
-            # Semantic selection is optional. Leaving the locator unresolved makes
+            # Semantic selection is optional. Leaving the candidate unresolved makes
             # the platform launcher return DECISION_REQUIRED before side effects.
             return None
         try:

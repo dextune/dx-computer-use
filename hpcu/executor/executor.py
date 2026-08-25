@@ -207,7 +207,7 @@ class Executor:
         try:
             result = await launcher.launch(
                 application,
-                candidate_id=prepared.action.target.locator,
+                candidate_id=prepared.action.application_candidate_id,
                 timeout_ms=prepared.action.timeout_ms,
                 poll_interval_ms=self._poll_interval_ms,
             )
