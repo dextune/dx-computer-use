@@ -147,8 +147,10 @@ async def test_preferred_os_candidate_binds_without_model_call():
     gateway = _Gateway("unused.desktop")
 
     resolved = await _resolver().resolve(_plan(), launcher, gateway)
+    action = resolved.nodes["launch"].action
 
-    assert resolved.nodes["launch"].action.target.locator == "browser.desktop"
+    assert action.application_candidate_id == "browser.desktop"
+    assert action.target.locator is None
     assert gateway.calls == []
     assert launcher.discover_calls == 1
     assert launcher.launch_calls == 0
@@ -163,8 +165,10 @@ async def test_ambiguous_os_candidates_use_budgeted_semantic_selection_once():
     gateway = BudgetedGateway(inner, ledger)
 
     resolved = await _resolver().resolve(_plan(), launcher, gateway)
+    action = resolved.nodes["launch"].action
 
-    assert resolved.nodes["launch"].action.target.locator == "second.desktop"
+    assert action.application_candidate_id == "second.desktop"
+    assert action.target.locator is None
     assert inner.calls == [ModelCallPurpose.APPLICATION_SELECTION]
     assert ledger.calls_by_purpose == {ModelCallPurpose.APPLICATION_SELECTION: 1}
     assert launcher.launch_calls == 0
@@ -177,8 +181,10 @@ async def test_model_cannot_invent_application_candidate():
     gateway = _Gateway("invented.desktop")
 
     resolved = await _resolver().resolve(_plan(), launcher, gateway)
+    action = resolved.nodes["launch"].action
 
-    assert resolved.nodes["launch"].action.target.locator is None
+    assert action.application_candidate_id is None
+    assert action.target.locator is None
     assert gateway.calls == [ModelCallPurpose.APPLICATION_SELECTION]
     assert launcher.launch_calls == 0
 
@@ -189,6 +195,8 @@ async def test_ambiguous_candidates_without_gateway_remain_unbound():
     launcher = _Launcher(candidates)
 
     resolved = await _resolver().resolve(_plan(), launcher, None)
+    action = resolved.nodes["launch"].action
 
-    assert resolved.nodes["launch"].action.target.locator is None
+    assert action.application_candidate_id is None
+    assert action.target.locator is None
     assert launcher.launch_calls == 0
