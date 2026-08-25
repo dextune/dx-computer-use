@@ -1,7 +1,8 @@
 """CompositeObserver — facade composing CaptureBackend + StructureObserver.
 
 Produces a SceneDelta (added/removed/modified) against the previous
-structure snapshot. Fingerprint matches keep the previous element id.
+structure snapshot. Cross-source observations are fused before temporal
+ID remapping and SceneDelta construction.
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from hpcu.capture.frame_store import FrameStore
 from hpcu.observation.base import Observer
 from hpcu.observation.structure_observer import StructureObserver
 from hpcu.perception.engine import ScreenPerception
+from hpcu.perception.fusion import FusionEngine
 from hpcu.perception.window_chrome import content_roi, primary_window
 from hpcu.scene_graph.tracker import ElementTracker
 from hpcu.schemas.scene import FrameHandle, Scene, SceneDelta
@@ -53,15 +55,19 @@ class PerformanceSnapshot:
             },
             "capture_structure_transaction": {
                 "count": self.capture_structure_transaction.count,
-                "total_latency_ms": self.capture_structure_transaction.total_latency_ms,
+                "total_latency_ms": (
+                    self.capture_structure_transaction.total_latency_ms
+                ),
                 "error_count": self.capture_structure_transaction.error_count,
-                "timeout_count": self.capture_structure_transaction.timeout_count,
+                "timeout_count": (
+                    self.capture_structure_transaction.timeout_count
+                ),
             },
         }
 
 
 class CompositeObserver(Observer):
-    """Combines capture (pixels) and structure (tree) into one SceneDelta."""
+    """Combines capture, structure and local perception into one SceneDelta."""
 
     def __init__(
         self,
@@ -71,14 +77,20 @@ class CompositeObserver(Observer):
         tracker: Optional[ElementTracker] = None,
         perception: Optional[ScreenPerception] = None,
         config: Optional[dict] = None,
+        fusion_engine: Optional[FusionEngine] = None,
     ):
         super().__init__(session_id)
         self._validate_backend_session(capture_backend, "capture")
         self._validate_backend_session(structure_observer, "structure")
         self._capture_backend = capture_backend
         self._structure_observer = structure_observer
-        self._perception = perception if perception is not None else _auto_perception(
-            capture_backend
+        self._perception = (
+            perception
+            if perception is not None
+            else _auto_perception(capture_backend)
+        )
+        self._fusion_engine = (
+            fusion_engine if fusion_engine is not None else FusionEngine()
         )
         self._tracker = tracker if tracker is not None else ElementTracker()
         self._config = config
@@ -143,7 +155,9 @@ class CompositeObserver(Observer):
             await self._cancel_and_wait(transaction)
             raise
         else:
-            elapsed = int(asyncio.get_running_loop().time() * 1000 - t0)
+            elapsed = int(
+                asyncio.get_running_loop().time() * 1000 - t0
+            )
             metric.total_latency_ms += elapsed
         return result
 
@@ -171,16 +185,27 @@ class CompositeObserver(Observer):
         self.performance_snapshot.capture_structure_transaction.count += 1
 
         if self._perception is not None and frame is not None:
-            roi = content_roi(primary_window(Scene(version=0, elements=current)))
+            roi = content_roi(
+                primary_window(Scene(version=0, elements=current))
+            )
             perceived = await self._perception.elements_from_frame_async(
-                frame, self._version + 1, roi=roi
+                frame,
+                self._version + 1,
+                roi=roi,
             )
             if not perceived and roi is not None:
                 perceived = await self._perception.elements_from_frame_async(
-                    frame, self._version + 1, roi=None
+                    frame,
+                    self._version + 1,
+                    roi=None,
                 )
             for element in perceived:
                 current[element.id] = element
+
+        if current:
+            fused = self._fusion_engine.fuse(current.values())
+            current = {element.id: element for element in fused.elements}
+
         remapped = self._remap_ids(current)
         base_version = self._version
         self._version += 1
@@ -226,7 +251,9 @@ class CompositeObserver(Observer):
             if self._structure_observer is None:
                 result: dict[str, UIElement] = {}
             else:
-                snapshot = await self._structure_observer.observe_structure()
+                snapshot = (
+                    await self._structure_observer.observe_structure()
+                )
                 result = {element.id: element for element in snapshot}
         except TimeoutError:
             metric.timeout_count += 1
@@ -241,15 +268,24 @@ class CompositeObserver(Observer):
             )
             return result
 
-    def _remap_ids(self, current: dict[str, UIElement]) -> dict[str, UIElement]:
+    def _remap_ids(
+        self,
+        current: dict[str, UIElement],
+    ) -> dict[str, UIElement]:
         if not self._previous:
             return dict(current)
-        fingerprint_map = self._tracker.match_by_fingerprint(current, self._previous)
+        fingerprint_map = self._tracker.match_by_fingerprint(
+            current,
+            self._previous,
+        )
         remapped: dict[str, UIElement] = {}
         for current_id, element in current.items():
             previous_id = fingerprint_map.get(current_id, current_id)
             if previous_id != current_id:
-                remapped[previous_id] = replace(element, id=previous_id)
+                remapped[previous_id] = replace(
+                    element,
+                    id=previous_id,
+                )
             else:
                 remapped[current_id] = element
         return remapped
@@ -258,9 +294,17 @@ class CompositeObserver(Observer):
     def _diff(
         previous: dict[str, UIElement],
         current: dict[str, UIElement],
-    ) -> tuple[tuple[UIElement, ...], tuple[str, ...], tuple[UIElement, ...]]:
-        added = tuple(current[key] for key in current if key not in previous)
-        removed = tuple(key for key in previous if key not in current)
+    ) -> tuple[
+        tuple[UIElement, ...],
+        tuple[str, ...],
+        tuple[UIElement, ...],
+    ]:
+        added = tuple(
+            current[key] for key in current if key not in previous
+        )
+        removed = tuple(
+            key for key in previous if key not in current
+        )
         modified = tuple(
             current[key]
             for key in current
@@ -268,12 +312,20 @@ class CompositeObserver(Observer):
         )
         return added, removed, modified
 
-    def _validate_backend_session(self, backend: object, label: str) -> None:
+    def _validate_backend_session(
+        self,
+        backend: object,
+        label: str,
+    ) -> None:
         backend_session = getattr(backend, "session_id", None)
-        if backend_session is not None and backend_session != self._session_id:
+        if (
+            backend_session is not None
+            and backend_session != self._session_id
+        ):
             raise ValueError(
-                f"CompositeObserver session mismatch: {label} backend is bound to "
-                f"{backend_session!r}, observer to {self._session_id!r}"
+                "CompositeObserver session mismatch: "
+                f"{label} backend is bound to {backend_session!r}, "
+                f"observer to {self._session_id!r}"
             )
 
 
