@@ -106,3 +106,18 @@ def test_relation_policy_reads_runtime_configuration_and_validates_thresholds():
     assert policy.containment_ratio == 0.9
     with pytest.raises(ValueError, match="axis_overlap_ratio"):
         RelationPolicy(0.9, 1, 1, 1.1, 0)
+
+
+def test_equal_geometry_does_not_create_parent_cycle():
+    elements = derive_spatial_relations(
+        (
+            _element("a", 10, 10, 40, 20),
+            _element("b", 10, 10, 40, 20),
+        ),
+        POLICY,
+    )
+    by_id = _by_id(elements)
+    assert by_id["a"].relations.parent is None
+    assert by_id["b"].relations.parent is None
+    assert by_id["a"].relations.contains == ()
+    assert by_id["b"].relations.contains == ()

@@ -73,13 +73,13 @@ def derive_spatial_relations(
             first_contains_second = _containment_ratio(first_box, second_box)
             second_contains_first = _containment_ratio(second_box, first_box)
             if (
-                first_box.area >= second_box.area
+                first_box.area > second_box.area
                 and first_contains_second >= policy.containment_ratio
             ):
                 contains[first.id].add(second.id)
                 parent_candidates[second.id].append((first_box.area, first.id))
             if (
-                second_box.area >= first_box.area
+                second_box.area > first_box.area
                 and second_contains_first >= policy.containment_ratio
             ):
                 contains[second.id].add(first.id)
