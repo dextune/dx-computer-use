@@ -8,6 +8,7 @@ semantic:
     plan_compile_max_tokens: 131072
     intent_fill_max_tokens: 32768
     application_selection_max_tokens: 256
+    grounding_max_tokens: 512
     action_decision_max_tokens: 65536
     reanalysis_max_tokens: 65536
     intent_fill_retry_attempts: 1
@@ -129,6 +130,29 @@ scene_graph:
     column_center_tolerance_px: 8
     axis_overlap_ratio: 0.50
     gap_tolerance_px: 2
+
+grounding:
+  min_index_candidates_before_narrowing: 1
+  max_returned_candidates: 8
+  semantic_top_k: 5
+  reference_mode: false
+  temporal_stable_frames: 3
+  confidence_coverage_weight: 0.10
+  weights:
+    text: 0.60
+    role: 0.10
+    source: 0.10
+    structure: 0.07
+    relation: 0.08
+    temporal: 0.05
+  source_reliability:
+    dom: 1.00
+    uia: 0.96
+    atspi: 0.93
+    ax: 0.93
+    ocr: 0.55
+    template: 0.60
+    unknown: 0.40
 
 targeting:
   max_tokens_per_field: 8

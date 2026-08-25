@@ -13,6 +13,19 @@ from hpcu.schemas.ui_element import UIElement
 
 _HANGUL_SPACE = re.compile(r"(?<=[가-힣])\s+(?=[가-힣])")
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+_SUPPORTED_RELATIONS = frozenset(
+    {
+        "inside",
+        "parent",
+        "same_row",
+        "same_column",
+        "above",
+        "below",
+        "left_of",
+        "right_of",
+        "contains",
+    }
+)
 
 
 class StaleSceneIndexError(RuntimeError):
@@ -33,6 +46,20 @@ def _tokens(value: str) -> tuple[str, ...]:
     if compact:
         tokens.add(compact)
     return tuple(sorted(tokens))
+
+
+def _character_grams(value: str, size: int) -> tuple[str, ...]:
+    compact = _normalize_text(value).replace(" ", "")
+    if not compact or size <= 0 or len(compact) < size:
+        return ()
+    return tuple(
+        sorted(
+            {
+                compact[index : index + size]
+                for index in range(len(compact) - size + 1)
+            }
+        )
+    )
 
 
 def _valid_box(box: BoundingBox | None) -> bool:
@@ -78,7 +105,7 @@ def _box_distance(first: BoundingBox, second: BoundingBox) -> float:
 
 
 class SceneIndex:
-    """Role, text and uniform-grid spatial indexes for exactly one Scene."""
+    """Role, text, relation and uniform-grid indexes for exactly one Scene."""
 
     def __init__(self, scene: Scene, *, cell_size_px: int) -> None:
         if cell_size_px <= 0:
@@ -88,6 +115,7 @@ class SceneIndex:
         self._elements = scene.elements
         self._role: dict[str, set[str]] = {}
         self._text: dict[str, set[str]] = {}
+        self._text_grams: dict[tuple[int, str], set[str]] = {}
         self._grid: dict[tuple[CoordinateSpace, int, int], set[str]] = {}
         self._by_space: dict[CoordinateSpace, set[str]] = {}
         for element in scene.elements.values():
@@ -131,6 +159,46 @@ class SceneIndex:
         matched = set(buckets[0])
         for bucket in buckets[1:]:
             matched.intersection_update(bucket)
+        return self._ordered(matched)
+
+    def by_text_candidates(self, value: str) -> tuple[str, ...]:
+        """Return a safe superset of elements with possible non-zero text match."""
+        matched: set[str] = set()
+        for token in _tokens(value):
+            matched.update(self._text.get(token, ()))
+
+        compact = _normalize_text(value).replace(" ", "")
+        if compact:
+            size = min(3, len(compact))
+            grams = _character_grams(compact, size)
+            if grams:
+                buckets = [
+                    self._text_grams.get((size, gram), set()) for gram in grams
+                ]
+                if buckets and all(buckets):
+                    substring_ids = set(buckets[0])
+                    for bucket in buckets[1:]:
+                        substring_ids.intersection_update(bucket)
+                    matched.update(substring_ids)
+        return self._ordered(matched)
+
+    def by_relation(self, relation: str, anchor_element_id: str) -> tuple[str, ...]:
+        """Return elements satisfying one explicit precompiled relation constraint."""
+        normalized = relation.strip().casefold()
+        anchor = anchor_element_id.strip()
+        if normalized not in _SUPPORTED_RELATIONS:
+            raise ValueError(f"unsupported scene relation: {relation!r}")
+        if not anchor or anchor not in self._elements:
+            return ()
+        matched: list[str] = []
+        for element in self._elements.values():
+            relations = element.relations
+            if normalized in ("inside", "parent"):
+                holds = relations.parent == anchor
+            else:
+                holds = anchor in getattr(relations, normalized, ())
+            if holds:
+                matched.append(element.id)
         return self._ordered(matched)
 
     def inside(self, bbox: BoundingBox) -> tuple[str, ...]:
@@ -211,9 +279,15 @@ class SceneIndex:
         role = element.role.strip().casefold()
         if role:
             self._role.setdefault(role, set()).add(element.id)
-        text = " ".join(value for value in (element.name, element.text) if value)
+        values = tuple(
+            dict.fromkeys(value for value in (element.name, element.text) if value)
+        )
+        text = " ".join(values)
         for token in _tokens(text):
             self._text.setdefault(token, set()).add(element.id)
+        for size in (1, 2, 3):
+            for gram in _character_grams(text, size):
+                self._text_grams.setdefault((size, gram), set()).add(element.id)
         if not _valid_box(element.bbox):
             return
         self._by_space.setdefault(element.bbox.space, set()).add(element.id)

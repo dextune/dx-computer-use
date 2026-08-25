@@ -14,6 +14,20 @@ from hpcu.schemas.failure_codes import FailureCode
 from hpcu.schemas.goal import GoalEnvelope
 from hpcu.schemas.surface import SurfaceKind
 
+_TARGET_RELATIONS = frozenset(
+    {
+        "inside",
+        "parent",
+        "same_row",
+        "same_column",
+        "above",
+        "below",
+        "left_of",
+        "right_of",
+        "contains",
+    }
+)
+
 
 @dataclass(frozen=True)
 class TargetQuerySpec:
@@ -21,6 +35,8 @@ class TargetQuerySpec:
     role: str | None = None
     confidence_threshold: float | None = None
     min_margin: float | None = None
+    relation: str | None = None
+    anchor_element_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.confidence_threshold is not None and not (
@@ -29,6 +45,14 @@ class TargetQuerySpec:
             raise ValueError("confidence_threshold must be in [0, 1]")
         if self.min_margin is not None and not 0.0 <= self.min_margin <= 1.0:
             raise ValueError("min_margin must be in [0, 1]")
+        relation = (self.relation or "").strip().casefold()
+        anchor = (self.anchor_element_id or "").strip()
+        if relation and relation not in _TARGET_RELATIONS:
+            raise ValueError(f"unsupported target relation: {self.relation!r}")
+        if bool(relation) != bool(anchor):
+            raise ValueError(
+                "relation and anchor_element_id must be supplied together"
+            )
 
     def as_dict(self) -> dict[str, object]:
         result: dict[str, object] = {"text": self.text}
@@ -38,6 +62,10 @@ class TargetQuerySpec:
             result["confidence_threshold"] = self.confidence_threshold
         if self.min_margin is not None:
             result["min_margin"] = self.min_margin
+        if self.relation is not None:
+            result["relation"] = self.relation
+        if self.anchor_element_id is not None:
+            result["anchor_element_id"] = self.anchor_element_id
         return result
 
 

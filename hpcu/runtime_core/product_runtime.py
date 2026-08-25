@@ -15,7 +15,10 @@ from hpcu.gateway.gateway import (
 from hpcu.lifecycle.resolver import ApplicationPlanResolver
 from hpcu.planning.goal_interpreter import GoalInterpreter
 from hpcu.planning.plan_compiler import PlanCompiler
-from hpcu.planning.semantic_interrupt import SemanticSlotFiller
+from hpcu.planning.semantic_interrupt import (
+    SemanticGroundingInterrupt,
+    SemanticSlotFiller,
+)
 from hpcu.planning.strategy_planner import StrategyPlanner
 from hpcu.runtime_config import (
     configured_semantic_identity,
@@ -193,11 +196,10 @@ class CommandRuntime:
             launcher,
             gateway,
         )
-        semantic_replanner = (
-            self._semantic_replanner_factory(gateway, ledger)
-            if gateway is not None
-            and self._semantic_replanner_factory is not None
-            else None
+        semantic_replanner = self._semantic_replanner(
+            gateway,
+            ledger,
+            control_loop,
         )
         begin_task = getattr(control_loop, "begin_task", None)
         if callable(begin_task):
@@ -227,6 +229,31 @@ class CommandRuntime:
             model_calls_by_purpose=calls_by_purpose,
             provider_id=gateway.provider_id if gateway is not None else "",
             model_id=gateway.model_id if gateway is not None else "",
+        )
+
+    def _semantic_replanner(
+        self,
+        gateway: Gateway | None,
+        ledger: TaskBudgetLedger,
+        control_loop: ControlLoop,
+    ) -> Repairer | None:
+        if gateway is None:
+            return None
+        if self._semantic_replanner_factory is not None:
+            return self._semantic_replanner_factory(gateway, ledger)
+        limits = self._config.get("semantic", {}).get("request_limits", {})
+        grounding = self._config.get("grounding", {})
+        confidence = self._config.get("confidence", {})
+        return SemanticGroundingInterrupt(
+            gateway,
+            scene_provider=lambda: control_loop.scene,
+            grounder=control_loop.grounder,
+            max_tokens=int(limits.get("grounding_max_tokens", 512)),
+            timeout_ms=semantic_call_timeout_ms(self._config),
+            top_k=int(grounding.get("semantic_top_k", 5)),
+            min_candidate_confidence=float(
+                confidence.get("text_llm_threshold", 0.72)
+            ),
         )
 
     def _apply_semantic_fill(
