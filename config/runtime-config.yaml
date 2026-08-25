@@ -70,6 +70,15 @@ perception:
   ocr_cache_entries: 32
   dirty_roi_max_ratio: 0.35
 
+scene_graph:
+  index_cell_size_px: 128
+  relations:
+    containment_ratio: 0.95
+    row_center_tolerance_px: 8
+    column_center_tolerance_px: 8
+    axis_overlap_ratio: 0.50
+    gap_tolerance_px: 2
+
 targeting:
   max_tokens_per_field: 8
   min_token_length: 2

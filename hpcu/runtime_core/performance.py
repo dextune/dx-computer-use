@@ -26,10 +26,19 @@ class StageMetric:
 
 
 @dataclass(frozen=True)
+class CounterMetric:
+    """Aggregated non-time workload count, such as processed pixels."""
+
+    name: str
+    value: int
+
+
+@dataclass(frozen=True)
 class PerformanceSnapshot:
-    """Immutable deterministic snapshot of all measured runtime stages."""
+    """Immutable deterministic snapshot of measured stages and workload counters."""
 
     stages: tuple[StageMetric, ...]
+    counters: tuple[CounterMetric, ...] = ()
 
     def as_dict(self) -> dict[str, dict[str, int]]:
         return {
@@ -43,6 +52,9 @@ class PerformanceSnapshot:
             }
             for stage in self.stages
         }
+
+    def counters_as_dict(self) -> dict[str, int]:
+        return {counter.name: counter.value for counter in self.counters}
 
 
 @dataclass
@@ -67,6 +79,7 @@ class PerformanceTrace:
         self._cpu_time_ns = cpu_time_ns or time.process_time_ns
         self._lock = threading.Lock()
         self._stages: dict[str, _MutableStage] = {}
+        self._counters: dict[str, int] = {}
 
     def record(
         self,
@@ -89,6 +102,18 @@ class PerformanceTrace:
             stage.cpu_us += cpu
             stage.max_us = max(stage.max_us, elapsed)
             stage.max_queue_depth = max(stage.max_queue_depth, depth)
+
+    def increment_counter(self, name: str, value: int = 1) -> None:
+        """Increment a deterministic non-time workload counter."""
+
+        normalized = name.strip()
+        if not normalized:
+            raise ValueError("performance counter name must be non-empty")
+        increment = int(value)
+        if increment < 0:
+            raise ValueError("performance counter increment must be >= 0")
+        with self._lock:
+            self._counters[normalized] = self._counters.get(normalized, 0) + increment
 
     @contextmanager
     def measure(
@@ -141,8 +166,13 @@ class PerformanceTrace:
                 )
                 for name, value in sorted(self._stages.items())
             )
-        return PerformanceSnapshot(stages=stages)
+            counters = tuple(
+                CounterMetric(name=name, value=value)
+                for name, value in sorted(self._counters.items())
+            )
+        return PerformanceSnapshot(stages=stages, counters=counters)
 
     def reset(self) -> None:
         with self._lock:
             self._stages.clear()
+            self._counters.clear()
