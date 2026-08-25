@@ -37,14 +37,18 @@ class ElementTracker:
         previous_by_fingerprint: dict[str, list[str]] = {}
         for element_id, element in previous.items():
             if element.fingerprint:
-                previous_by_fingerprint.setdefault(element.fingerprint, []).append(element_id)
+                previous_by_fingerprint.setdefault(
+                    element.fingerprint, []
+                ).append(element_id)
 
         result: dict[str, str] = {}
         allocated: set[str] = set()
         for element_id, element in current.items():
             if not element.fingerprint:
                 continue
-            for candidate in previous_by_fingerprint.get(element.fingerprint, ()):
+            for candidate in previous_by_fingerprint.get(
+                element.fingerprint, ()
+            ):
                 if candidate not in allocated:
                     result[element_id] = candidate
                     allocated.add(candidate)
@@ -61,7 +65,10 @@ class ElementTracker:
             return {}
         current_ids = list(current)
         previous_ids = list(previous)
-        cost = np.full((len(current_ids), len(previous_ids)), _NO_MATCH_COST)
+        cost = np.full(
+            (len(current_ids), len(previous_ids)),
+            _NO_MATCH_COST,
+        )
         for row, current_id in enumerate(current_ids):
             current_box = current[current_id].bbox
             if current_box is None:
@@ -73,7 +80,7 @@ class ElementTracker:
                 iou = _bounding_box_iou(current_box, previous_box)
                 cost[row, col] = 1.0 - iou
 
-        assignment = _hungarian_assign(cost)
+        assignment = minimum_cost_assignment(cost)
         result: dict[str, str] = {}
         for row, col in assignment:
             iou = 1.0 - cost[row, col]
@@ -89,32 +96,55 @@ class ElementTracker:
         """Return current ids not matched to a previous element."""
         matched: dict[str, str] = {}
         matched.update(self.match_by_fingerprint(current, previous))
-        for current_id, previous_id in self.match_by_iou(current, previous).items():
+        for current_id, previous_id in self.match_by_iou(
+            current, previous
+        ).items():
             matched.setdefault(current_id, previous_id)
-        return [element_id for element_id in current if element_id not in matched]
+        return [
+            element_id
+            for element_id in current
+            if element_id not in matched
+        ]
 
 
 def _bounding_box_iou(first: BoundingBox, second: BoundingBox) -> float:
     intersect_width = max(
         0.0,
-        min(first.x + first.width, second.x + second.width) - max(first.x, second.x),
+        min(first.x + first.width, second.x + second.width)
+        - max(first.x, second.x),
     )
     intersect_height = max(
         0.0,
-        min(first.y + first.height, second.y + second.height) - max(first.y, second.y),
+        min(first.y + first.height, second.y + second.height)
+        - max(first.y, second.y),
     )
     intersection = intersect_width * intersect_height
-    union = first.width * first.height + second.width * second.height - intersection
+    union = (
+        first.width * first.height
+        + second.width * second.height
+        - intersection
+    )
     if union <= 0.0:
         return 0.0
     return intersection / union
+
+
+def minimum_cost_assignment(
+    cost_matrix: np.ndarray,
+) -> list[tuple[int, int]]:
+    """Return deterministic minimum-cost row/column assignments.
+
+    This is the shared Hungarian primitive for temporal tracking and
+    cross-source observation fusion.
+    """
+    return _hungarian_assign(cost_matrix)
 
 
 def _hungarian_assign(cost_matrix: np.ndarray) -> list[tuple[int, int]]:
     """Min-cost assignment for a (possibly rectangular) cost matrix.
 
     Returns a list of `(row, col)` pairs choosing the minimum total cost,
-    where each row and each column is used at most once.  The matrix is
+    where each row and each column is used at most once. The matrix is
     padded with a large sentinel cost to square it for the Hungarian
     algorithm; padded rows/columns are omitted from the result.
     """
