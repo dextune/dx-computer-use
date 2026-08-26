@@ -126,7 +126,10 @@ def test_qualified_replay_freshly_regrounds_current_scene_and_activates():
     assert result.grounding.element_id == "fresh-button"
     assert result.fresh_scene_version == 9
     assert result.coordinate_replay_executions == 0
-    assert grounder.calls == [({"text": "Submit"}, 9, ("fresh-button",))]
+    assert grounder.calls == [
+        ({"text": "Submit"}, 9, ("fresh-button",)),
+        ({"text": "Submit"}, 9, ("fresh-button",)),
+    ]
     assert cache.get(result.cache_key).state is ExperienceState.ACTIVE
 
 
@@ -198,3 +201,23 @@ def test_offline_replay_qualification_uses_fresh_grounding_parity():
         ({"text": "Submit"}, 3, ("fresh-button",)),
         ({"text": "Submit"}, 3, ("fresh-button",)),
     ]
+
+
+def test_structural_hint_change_resets_success_streak():
+    cache = ExperienceCache(min_successes=2)
+    first_hint = GroundingHint(
+        "surface-v1",
+        "submit",
+        preferred_roles=("button",),
+    )
+    changed_hint = GroundingHint(
+        "surface-v1",
+        "submit",
+        preferred_roles=("link",),
+    )
+    first = cache.record_verified_success(first_hint, scene_version=1)
+    changed = cache.record_verified_success(changed_hint, scene_version=2)
+    assert changed.cache_key == first.cache_key
+    assert changed.success_count == 1
+    assert changed.failure_count == 1
+    assert changed.state is ExperienceState.EXPERIMENTAL
