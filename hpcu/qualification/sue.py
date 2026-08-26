@@ -92,6 +92,7 @@ class SUEQualificationThresholds:
     minimum_top1_precision: float = 1.0
     minimum_confident_local_precision: float = 1.0
     minimum_ambiguity_detection_rate: float = 1.0
+    minimum_local_resolution_rate: float = 1.0
     maximum_unnecessary_semantic_escalation_rate: float = 0.0
     maximum_stale_action_executions: int = 0
     maximum_false_completions: int = 0
@@ -109,6 +110,7 @@ class SUEQualificationThresholds:
             "minimum_top1_precision",
             "minimum_confident_local_precision",
             "minimum_ambiguity_detection_rate",
+            "minimum_local_resolution_rate",
             "maximum_unnecessary_semantic_escalation_rate",
         ):
             value = getattr(self, name)
@@ -237,12 +239,16 @@ def qualify_sue(
         reasons.append("missing_sue_fixture_families")
     if thresholds.require_performance_baseline and not perf_items:
         reasons.append("missing_sue_performance_baseline")
+    elif thresholds.require_performance_baseline and len(perf_items) != len(items):
+        reasons.append("incomplete_sue_performance_baseline")
     if top1_precision < thresholds.minimum_top1_precision:
         reasons.append("top1_precision_below_threshold")
     if confident_precision < thresholds.minimum_confident_local_precision:
         reasons.append("confident_local_precision_below_threshold")
     if ambiguity_rate < thresholds.minimum_ambiguity_detection_rate:
         reasons.append("ambiguity_detection_below_threshold")
+    if local_resolution_rate < thresholds.minimum_local_resolution_rate:
+        reasons.append("local_resolution_below_threshold")
     if escalation_rate > thresholds.maximum_unnecessary_semantic_escalation_rate:
         reasons.append("unnecessary_semantic_escalation_detected")
     if stale_actions > thresholds.maximum_stale_action_executions:
