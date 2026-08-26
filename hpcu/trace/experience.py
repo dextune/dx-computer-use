@@ -133,21 +133,22 @@ class ExperienceCache:
         """Record a verified transition; one success never qualifies a hint."""
         key = self.key_for(hint)
         previous = self._entries.get(key)
-        success_count = 1 if previous is None else previous.success_count + 1
+        same_hint = previous is not None and previous.hint == hint
+        success_count = previous.success_count + 1 if same_hint else 1
         prior_total = (
-            0
-            if previous is None
-            else previous.mean_latency_us * previous.success_count
+            previous.mean_latency_us * previous.success_count if same_hint else 0
         )
         mean_latency = (prior_total + max(0, int(latency_us))) // success_count
         state = ExperienceState.EXPERIMENTAL
         replay_passed = False
         failure_count = 0
-        if previous is not None:
+        if same_hint:
             if previous.state in (ExperienceState.QUALIFIED, ExperienceState.ACTIVE):
                 state = previous.state
             replay_passed = previous.offline_replay_passed
             failure_count = previous.failure_count
+        elif previous is not None:
+            failure_count = previous.failure_count + 1
         entry = ExperienceEntry(
             cache_key=key,
             hint=hint,
@@ -282,12 +283,14 @@ class ExperienceCache:
 
         grounding = grounder.resolve(target_query, narrowed)
         element_id = getattr(grounding, "element_id", None)
+        baseline = grounder.resolve(target_query, scene)
+        baseline_id = getattr(baseline, "element_id", None)
         fresh = _is_fresh_resolved(scene, element_id)
-        if not fresh:
+        parity = element_id is not None and element_id == baseline_id
+        if not fresh or not parity:
             self.mark_drift(entry.cache_key)
-            fallback = grounder.resolve(target_query, scene)
             return ExperienceReplayResult(
-                grounding=fallback,
+                grounding=baseline,
                 cache_key=entry.cache_key,
                 used_hint=False,
                 fallback_used=True,
