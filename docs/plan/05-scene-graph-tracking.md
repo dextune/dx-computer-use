@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime 개발 계획 05 — Scene Graph 및 객체 추적"
-version: "1.0"
-date: "2026-08-21"
+version: "1.1"
+date: "2026-08-26"
 parent: "docs/dev-init-001.md (§9~10)"
 language: "ko-KR"
 ---
@@ -36,3 +36,17 @@ Native stable ID exact match
 - scene_version은 단조 증가.
 - 요소 id는 좌표가 아니라 fingerprint/relations로 유지.
 - delta는 변경분만 전파.
+
+## 5. Screen Understanding Engine 계약
+
+SUE는 기존 immutable Scene fold 책임을 유지하면서 index와 temporal identity를 강화한다.
+
+- `SceneIndex`의 indexed query와 brute-force reference query는 같은 executable 결과를
+  내야 한다.
+- source ref/fingerprint exact match를 먼저 사용하고, composite temporal cost는 impacted
+  dirty ROI에서만 계산한다.
+- source provenance와 relation을 보존하며 false merge보다 duplicate retention을 선호한다.
+- 현재 `Scene.version`과 다른 element는 Grounder의 executable candidate가 될 수 없다.
+- removed/stale object는 Scene과 index에서 함께 제거한다.
+- 36-case held-out matrix는 indexed/reference parity와 stale candidate 배제를 release gate로
+  사용한다.
