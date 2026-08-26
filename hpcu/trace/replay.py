@@ -1,12 +1,11 @@
-"""Offline trace replay — deterministic verification.
+"""Offline trace and verified-experience replay."""
 
-Replays a stored trajectory and validates that:
-  - The same sequence of events is produced.
-  - Stale actions (scene_version mismatch) are detected.
-  - No model calls are made during replay.
-"""
+from __future__ import annotations
 
-from hpcu.schemas.trace import TraceEventType, TraceRecord
+from typing import Any
+
+from hpcu.schemas.trace import TraceRecord
+from hpcu.trace.experience import ExperienceCache, ExperienceReplayResult, GrounderLike
 
 
 class ReplayEngine:
@@ -26,7 +25,6 @@ class ReplayEngine:
         return self._stale_count
 
     def next_record(self) -> TraceRecord | None:
-        """Return the next record in the trace, or None if done."""
         if self._position >= len(self._records):
             return None
         record = self._records[self._position]
@@ -34,10 +32,6 @@ class ReplayEngine:
         return record
 
     def check_stale(self, current_scene_version: int) -> bool:
-        """Check if the current scene is stale relative to the trace.
-
-        Returns True if the action should be rejected (scene moved on).
-        """
         if self._position < len(self._records):
             expected = self._records[self._position]
             if expected.scene_version > current_scene_version:
@@ -48,24 +42,15 @@ class ReplayEngine:
     def validate_trajectory(
         self, actual: tuple[TraceRecord, ...]
     ) -> tuple[bool, int]:
-        """Validate that an actual trace matches the stored trajectory.
-
-        Returns (is_valid, mismatch_count).
-        """
         mismatch_count = 0
         max_len = max(len(self._records), len(actual))
 
         for i in range(max_len):
-            if i >= len(self._records):
+            if i >= len(self._records) or i >= len(actual):
                 mismatch_count += 1
                 continue
-            if i >= len(actual):
-                mismatch_count += 1
-                continue
-
             expected = self._records[i]
             got = actual[i]
-
             if expected.event_type != got.event_type:
                 mismatch_count += 1
             elif expected.scene_version != got.scene_version:
@@ -74,3 +59,29 @@ class ReplayEngine:
                 mismatch_count += 1
 
         return (mismatch_count == 0, mismatch_count)
+
+
+class ExperienceReplayEngine:
+    """Thin replay boundary that guarantees fresh re-grounding through the cache."""
+
+    def __init__(self, cache: ExperienceCache, grounder: GrounderLike):
+        self._cache = cache
+        self._grounder = grounder
+
+    def reground(
+        self,
+        *,
+        target_query: dict[str, Any],
+        scene: Any,
+        surface_fingerprint: str,
+        target_signature: str,
+        plan_node_signature: str = "",
+    ) -> ExperienceReplayResult:
+        return self._cache.replay(
+            grounder=self._grounder,
+            target_query=target_query,
+            scene=scene,
+            surface_fingerprint=surface_fingerprint,
+            target_signature=target_signature,
+            plan_node_signature=plan_node_signature,
+        )
