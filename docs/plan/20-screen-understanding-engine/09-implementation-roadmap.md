@@ -1,6 +1,6 @@
 ---
 title: "Screen Understanding Engine 09 — 상세 구현 로드맵"
-version: "1.1"
+version: "1.2"
 date: "2026-08-26"
 parent: "docs/plan/20-screen-understanding-engine/index.md"
 language: "ko-KR"
@@ -12,6 +12,10 @@ language: "ko-KR"
 
 한 단계가 fixture와 benchmark로 닫히기 전 다음 단계의 최적화를 무리하게 넣지 않는다.
 19번 플랜의 CommandRuntime E2E를 깨뜨리지 않는 작은 main 커밋 단위로 진행한다.
+
+> §2~§8의 세부 체크박스는 최초 구현 분해 목록이다. 실행 후 authoritative 상태는 §15와
+> `docs/plan/tasklist.md`의 SUE 블록을 사용한다. 실측으로 증명되지 않은 항목을 소급해 `[x]`로
+> 바꾸지 않는다.
 
 ## 2. SUE-0 — Baseline/Profile 고정
 
@@ -195,7 +199,7 @@ qualified repeated fixture model call 0, fixed coordinate replay 0.
 - [~] benchmark A/B report — artifact writer/gate 구현 완료, reference-hardware 실측 run 필요
 - [x] final thresholds/SLO 고정
 - [x] 소유 문서 03/04/05/06/11 동기화 (`03`은 기존 SUE observation 계약 재검토, 변경 불필요)
-- [~] tasklist에 테스트로 증명된 항목만 `[x]` — 이 문서의 아래 상태표를 SUE authoritative status로 사용
+- [x] tasklist에 테스트로 증명된 항목만 상태 반영 — `docs/plan/tasklist.md` SUE 블록
 
 ## 11. 커밋 단위 권장
 
@@ -255,13 +259,17 @@ Commit J  docs: consolidate verified SUE contracts into owner specs
 
 ## 15. 현재 완료 판정 — 2026-08-26
 
-SUE-7 구현/portable test는 완료다. SUE-8의 qualification 코드, 36-case held-out matrix,
-필수 artifact writer, CI gate 연결, Linux terminal E2E test path도 구현 완료다.
+SUE-1~6은 기존 `main` 구현 커밋과 테스트를 기준으로 기능 구현 완료다. SUE-7 구현/portable
+테스트도 완료다. SUE-8의 qualification 코드, 36-case held-out matrix, 필수 artifact writer,
+CI gate 연결, Linux terminal E2E test path도 구현 완료다.
+
+SUE-0은 계측 기반은 존재하지만 reference hardware의 재현 가능한 30-run baseline/A-B 실측
+증거가 아직 없다. 이 실측은 SUE-8 Q5 증거와 같은 artifact run으로 닫는다.
 
 최종 **product qualification**은 코드 존재와 구분한다. 다음 두 실측 증거가 없는 상태에서는
 20번 전체 Definition of Done을 `[x]`로 선언하지 않는다.
 
-1. reference hardware에서 생성된 baseline-vs-SUE A/B artifact 5종
+1. reference hardware에서 생성된 baseline-vs-SUE A/B artifact 5종과 qualification pass
 2. 실제 Linux X11 sandbox에서 terminal evidence E2E가 pass한 run
 
 따라서 남은 것은 신규 기능 개발이 아니라 위 qualification run/evidence 확보다.
