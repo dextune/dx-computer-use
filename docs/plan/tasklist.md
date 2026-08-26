@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime — 개발 태스크리스트"
-version: "1.2"
-date: "2026-08-22"
+version: "1.3"
+date: "2026-08-26"
 parent: "docs/plan/00-overview-and-goals.md, docs/dev-init-001.md §25, docs/plan/17-remaining-work-plan.md"
 language: "ko-KR"
 scope: "project-wide, progress tracking"
@@ -279,3 +279,25 @@ Phase 0-6의 ABC를 구현만 한다. 새 제어 루프를 만들지 않는다.
 - [x] S3 transient error 재시도 + backoff: `RetryableGateway`, action/reanalysis에도 retry 적용
 - [x] S4 reanalysis evidence fallback: schema 실패 시 `_pack_evidence_holds`로 2차 검증
 - [x] S5 10개 케이스 재실행 및 성공률 비교
+
+---
+
+## Screen Understanding Engine — SUE-0~8
+
+상세 설계/완료 판정은 `docs/plan/20-screen-understanding-engine/09-implementation-roadmap.md`를
+따른다. 이 블록은 SUE 범위의 실제 `main` 구현·테스트·실측 증거 상태만 요약한다.
+
+- [~] SUE-0 Baseline/Profile — stage/workload 계측 기반은 구현됨. reference-hardware에서
+      baseline-vs-SUE 30-run 실측 artifact는 아직 필요
+- [x] SUE-1 Region/Index — neutral region, deterministic index/relation, version guard
+- [x] SUE-2 Incremental Layout Segmentation — dirty ROI 기반 segmentation/region pipeline
+- [x] SUE-3 Cross-source Fusion — conservative source fusion + provenance + observer boundary
+- [x] SUE-4 Temporal Identity V2 — composite temporal tracking, dirty-region matching, stale cleanup
+- [x] SUE-5 Indexed Grounding V2 — indexed/reference resolver, relation/temporal scoring, ambiguity margin
+- [x] SUE-6 Structured AI Interrupt — bounded top-k semantic grounding interrupt + stale/purpose accounting
+- [x] SUE-7 Verified Experience Cache — coordinate-free SQLite cache, repeated-success qualification,
+      fresh re-ground parity, drift downgrade, coordinate replay 0
+- [~] SUE-8 Product Qualification — generic+SUE combined gate, 36-case held-out parity matrix,
+      mandatory 5-artifact writer, CI integration, Linux terminal E2E path 구현 완료. 최종 실측 증거 필요
+- [ ] SUE product evidence — reference hardware A/B artifact 5종 생성 및 gate pass
+- [ ] SUE live evidence — 실제 Linux X11 sandbox terminal E2E pass
