@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime 개발 계획 06 — Grounding·Confidence·AI 승격 정책"
-version: "1.0"
-date: "2026-08-21"
+version: "1.1"
+date: "2026-08-26"
 parent: "docs/dev-init-001.md (§11~13, §16, §12)"
 language: "ko-KR"
 ---
@@ -43,3 +43,18 @@ language: "ko-KR"
 - AI는 좌표가 아닌 `element_id`를 반환한다.
 - 응답은 schema validation + stale check 통과 후에만 사용.
 - `thinking` 태그는 strip state machine으로 제거.
+
+## 5. Screen Understanding Engine 계약
+
+- `Grounder.resolve()`는 `SceneIndex`로 후보를 줄이되 `resolve_reference()`와 executable
+  결과가 동일해야 한다.
+- relation/temporal stability는 점수 feature이며 confidence와 top1/top2 margin을 함께
+  통과한 경우에만 local execute한다.
+- 모호성은 structured semantic interrupt로 승격하며 AI 장애를 arbitrary click으로
+  바꾸지 않는다.
+- verified experience는 `hpcu/trace/experience.py`의 구조적 `GroundingHint`만 저장한다.
+  absolute coordinate, bbox, 과거 `element_id`는 저장 금지다.
+- qualified experience도 현재 Scene을 filter/rank하는 힌트일 뿐이다. 실행 전에는 반드시
+  normal Grounder로 fresh re-ground한다.
+- hint drift나 stale resolution은 즉시 downgrade하고 full fresh grounding 또는 halt로
+  돌아간다. fixed-coordinate replay는 허용하지 않는다.
