@@ -1,7 +1,7 @@
 ---
 title: "HPCU Runtime 개발 계획 04 — CPU 영상처리·OCR 파이프라인"
-version: "1.0"
-date: "2026-08-21"
+version: "1.1"
+date: "2026-08-26"
 parent: "docs/dev-init-001.md (§8, §20.3)"
 language: "ko-KR"
 ---
@@ -36,3 +36,16 @@ FrameHandle → ROI → OCR + Shape + Template → Association → Scene Graph
 - 동일 ROI hash는 캐시.
 - 저해상도 탐지 후 원본 crop 인식.
 - 고정 sleep 금지. settle detector로 대기.
+
+## 5. Screen Understanding Engine 계약
+
+SUE 경로에서는 `hpcu/perception/segmentation.py`와 fusion 계층이 raw observation을
+neutral region으로 정규화한 뒤 Scene Graph에 전달한다.
+
+- unchanged frame은 OCR/segmentation 재계산 0을 목표로 한다.
+- dirty ROI 밖 pixel/OCR 재계산은 qualification 실패 조건이다.
+- 구조 정보가 충분하면 pixel worker를 생략하고, structure-poor/pixels-only 화면만 ROI
+  perception으로 내려간다.
+- processed pixels, full/ROI OCR pass, first-actionable latency는
+  `hpcu/runtime_core/performance.py`의 안정된 stage/counter 이름으로 측정한다.
+- 정확도와 안전성이 baseline과 동일하지 않은 성능 개선은 인정하지 않는다.
