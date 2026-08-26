@@ -65,13 +65,20 @@ jobs:
           hpcu/schemas/strategy.py
           hpcu/vision/tesseract_ocr.py
           hpcu/cases
+          hpcu/trace/experience.py
+          hpcu/trace/replay.py
+          hpcu/trace/storage.py
+          hpcu/qualification/sue.py
           benchmarks/harness.py
+          benchmarks/sue_artifacts.py
           tests/integration/test_browser_bootstrap_runtime.py
+          tests/integration/test_sue_held_out_matrix.py
           tests/unit/test_application_plan_resolver.py
           tests/unit/test_async_gateway.py
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_browser_bootstrap.py
           tests/unit/test_budget_policy.py
+          tests/unit/test_experience_cache.py
           tests/unit/test_frame_store.py
           tests/unit/test_linux_browser_launcher.py
           tests/unit/test_observer_concurrency.py
@@ -80,6 +87,7 @@ jobs:
           tests/unit/test_product_runtime_resource_policy.py
           tests/unit/test_resource_policy.py
           tests/unit/test_runtime_architecture.py
+          tests/unit/test_sue_qualification.py
 
   focused-contracts:
     name: 2-focused-contracts
@@ -101,6 +109,7 @@ jobs:
           tests/unit/test_async_semantic_pipeline.py
           tests/unit/test_browser_bootstrap.py
           tests/unit/test_budget_policy.py
+          tests/unit/test_experience_cache.py
           tests/unit/test_frame_store.py
           tests/unit/test_linux_browser_launcher.py
           tests/unit/test_linux_sandbox.py
@@ -116,6 +125,7 @@ jobs:
           tests/unit/test_plan_runtime_contract.py
           tests/unit/test_temporal_runtime.py
           tests/unit/test_runtime_remediation.py
+          tests/unit/test_sue_qualification.py
           tests/unit/test_task_budget_retry.py
           tests/unit/test_control_loop.py
           tests/unit/test_executor.py
@@ -189,6 +199,7 @@ jobs:
               tests/unit/test_application_plan_resolver.py \
               tests/unit/test_browser_bootstrap.py \
               tests/unit/test_budget_policy.py \
+              tests/unit/test_experience_cache.py \
               tests/unit/test_frame_store.py \
               tests/unit/test_linux_browser_launcher.py \
               tests/unit/test_observer_concurrency.py \
@@ -197,8 +208,10 @@ jobs:
               tests/unit/test_product_runtime_resource_policy.py \
               tests/unit/test_runtime_architecture.py \
               tests/unit/test_plan_runtime_contract.py \
+              tests/unit/test_sue_qualification.py \
               tests/unit/test_temporal_runtime.py \
               tests/unit/test_task_budget_retry.py \
               tests/integration/test_browser_bootstrap_runtime.py \
-              tests/integration/test_command_plan_runtime.py
+              tests/integration/test_command_plan_runtime.py \
+              tests/integration/test_sue_held_out_matrix.py
           done
