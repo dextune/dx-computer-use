@@ -1,7 +1,7 @@
 ---
 title: "Screen Understanding Engine 08 — 테스트·벤치마크·Qualification"
-version: "1.0"
-date: "2026-08-25"
+version: "1.1"
+date: "2026-08-26"
 parent: "docs/plan/20-screen-understanding-engine/index.md"
 language: "ko-KR"
 ---
@@ -199,3 +199,22 @@ reference-hardware.json
 
 필요한 경우 시각 비교용 PNG를 남길 수 있으나 이미지 자체가 성공 판정의 유일한 근거가 되면
 안 된다.
+
+## 13. 구현 상태 — 2026-08-26
+
+Qualification 코드와 portable evidence path는 구현 완료다.
+
+- `hpcu/qualification/sue.py` — 30+ case, 12 fixture family, correctness/local-first/replay/
+  drift/performance A/B gate
+- `qualify_product_sue()` — 기존 product gate와 SUE gate를 모두 통과해야 최종 pass
+- `benchmarks/sue_artifacts.py` — §12의 필수 5개 artifact writer
+- `tests/unit/test_sue_qualification.py` — safety zero, A/B baseline 필수, p95/work regression,
+  combined gate를 positive/negative case로 검증
+- `tests/integration/test_sue_held_out_matrix.py` — 실제 `Grounder`의 indexed/reference 결과를
+  36개 held-out matrix에서 비교하고 ambiguity safe-abstention 검증
+- `tests/e2e/test_sue_linux_terminal.py` — Linux X11 sandbox terminal window evidence 경로
+
+`SUEQualificationThresholds` 기본값은 성능 baseline이 없는 run을 통과시키지 않는다. 따라서
+synthetic unit evidence나 test path 존재만으로 product qualification 완료를 선언할 수 없다.
+reference hardware A/B artifact와 Linux sandbox terminal 실기 결과가 실제로 생성된 run만
+최종 SUE-8 product evidence로 인정한다.
