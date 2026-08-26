@@ -1,7 +1,7 @@
 ---
 title: "Screen Understanding Engine 07 — Verified Experience Cache·Replay"
-version: "1.0"
-date: "2026-08-25"
+version: "1.1"
+date: "2026-08-26"
 parent: "docs/plan/20-screen-understanding-engine/index.md"
 language: "ko-KR"
 ---
@@ -139,3 +139,17 @@ Experience Cache가 성공하면 반복 작업에서 줄어야 하는 것은:
 - grounding latency
 
 오히려 hint lookup 비용이 일반 grounding보다 큰 경우 active path에서 제거한다.
+
+## 11. 구현 상태 — 2026-08-26
+
+SUE-7 구현은 다음 파일로 닫는다.
+
+- `hpcu/trace/experience.py` — coordinate-free `GroundingHint`, repeated-success lifecycle,
+  offline fresh-grounding parity qualification, drift downgrade, mandatory fresh re-ground
+- `hpcu/trace/storage.py` — versioned/bounded SQLite experience table, corrupt-row isolation
+- `hpcu/trace/replay.py` — `ExperienceReplayEngine`, coordinate replay 없이 cache replay 경계 제공
+- `tests/unit/test_experience_cache.py` — 좌표/`element_id` 저장 거부, bounded retention,
+  corrupt-row boot isolation, replay parity, fresh-scene activation, drift fallback 검증
+
+실행 불변식은 코드로 강제한다. qualified hint도 실행 좌표나 과거 `element_id`를 반환하지 않고,
+현재 `Scene.version`에 속한 후보를 좁힌 뒤 normal `Grounder.resolve()`를 다시 호출한다.
