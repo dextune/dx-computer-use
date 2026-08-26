@@ -149,3 +149,37 @@ def test_combined_product_and_sue_gate_requires_both_reports_to_pass():
     failed = qualify_product_sue(product_cases, _passing_cases())
     assert failed.passed is False
     assert failed.product.passed is False
+
+
+def test_sue_gate_rejects_unresolved_deterministic_target_without_escalation():
+    cases = _passing_cases()
+    case = cases[0]
+    if case.ambiguity_expected:
+        case = next(item for item in cases if not item.ambiguity_expected)
+        index = cases.index(case)
+    else:
+        index = 0
+    cases[index] = replace(
+        case,
+        resolved=False,
+        correct_target=False,
+        action_executed=False,
+        local_model_calls=0,
+    )
+    report = qualify_sue(cases)
+    assert report.passed is False
+    assert "local_resolution_below_threshold" in report.reasons
+
+
+def test_sue_gate_rejects_partial_performance_baseline_coverage():
+    cases = _passing_cases()
+    cases[0] = replace(
+        cases[0],
+        baseline_processed_pixels=0,
+        baseline_full_ocr_passes=0,
+        baseline_first_actionable_us=0,
+        baseline_grounding_us=0,
+    )
+    report = qualify_sue(cases)
+    assert report.passed is False
+    assert "incomplete_sue_performance_baseline" in report.reasons
